@@ -1,0 +1,60 @@
+--- 
+title: "Aerial Imagery and Point Cloud Data for Slash Pile Quantification"
+author: "George Woolsey"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+site: bookdown::bookdown_site
+output: 
+  bookdown::gitbook:
+    includes:
+      in_header: header.html
+documentclass: book
+book_filename: "manitou_slash_piles"
+output_dir: "../docs"
+language:
+  ui:
+    chapter_name: "Section "
+delete_merged_file: true
+bibliography: [packages.bib]
+biblio-style: apalike
+csl: https://raw.githubusercontent.com/citation-style-language/styles/master/research-institute-for-nature-and-forest.csl
+suppress-bibliography: true
+lang: en-US
+zotero: true
+link-citations: true
+description: "Using the bookdown package to write a book of data exploration. The output format for this example is bookdown::gitbook."
+---
+
+# Introduction
+
+Code in support of "Aerial Imagery and Point Cloud Data for Slash Pile Quantification"
+
+## Objective
+
+The objective of this study is to demonstrate the use of aerial point cloud data (SfM) and both RGB and hyperspectral imagery to identify and quanity slash piles.
+
+## Data{#data_desc}
+
+
+```{r, include=FALSE, echo=FALSE}
+knitr::write_bib(c(
+  .packages(),
+  "bookdown"
+  , "knitr"
+  , "rmarkdown"
+  , "tidyverse"
+  , "viridis"
+  , "RColorBrewer"
+  , "scales"
+  , "latex2exp"
+  , "mapview"
+  , "kableExtra"
+  , "patchwork"
+  , "ggnewscale"
+  , "terra"
+  , "stars"
+  , "sf"
+  , "brms"
+  , "tidybayes"
+  , "parallel"
+), 'packages.bib')
+```

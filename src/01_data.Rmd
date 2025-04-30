@@ -1,0 +1,342 @@
+# Data Processing
+
+Load the standard libraries we use to do work
+
+```{r, warning=FALSE, message=FALSE}
+# bread-and-butter
+library(tidyverse) # the tidyverse
+library(viridis) # viridis colors
+library(harrypotter) # hp colors
+library(RColorBrewer) # brewer colors
+library(scales) # work with number and plot scales
+library(latex2exp)
+
+# visualization
+library(mapview) # interactive html maps
+library(kableExtra) # tables
+library(patchwork) # combine plots
+
+# spatial analysis
+library(terra) # raster
+library(sf) # simple features
+library(lidR) # lidar data
+library(rgl) # 3d plots
+library(cloud2trees) # the cloud2trees
+```
+
+```{r pkg-ld, include=F, warning=F, message=F}
+# knit options
+knitr::opts_chunk$set(
+  echo = TRUE
+  , warning = FALSE
+  , message = FALSE
+  # , results = 'hide'
+  , fig.width = 10.5
+  , fig.height = 7
+)
+# option to put satellite imagery as base layer of mapview maps
+  mapview::mapviewOptions(
+    homebutton = FALSE
+    # , basemaps = c("Esri.WorldImagery","OpenStreetMap")
+    , basemaps = c("OpenStreetMap", "Esri.WorldImagery")
+  )
+# clean session
+remove(list = ls())
+gc()
+```
+
+## Slash Pile Vector Data
+
+```{r}
+slash_piles_sf <- sf::st_read("D:\\PFDP_Data\\PFDP_SlashPiles\\SlashPiles.shp") %>% 
+  dplyr::rename_with(tolower)
+```
+
+what? 
+
+```{r}
+slash_piles_sf %>% dplyr::glimpse()
+```
+
+where?
+
+```{r}
+mapview::mapview(slash_piles_sf, zcol = "comment", layer.name = "slash piles")
+```
+
+## Point Cloud Data
+
+Let's check out the point cloud data we got using UAS-SfM methods
+
+```{r}
+# directory with the downloaded .las|.laz files
+f <- "D:\\PFDP_Data\\p4pro_images\\P4Pro_06_17_2021_half_half_optimal\\2_densification\\point_cloud"
+# is there data?
+list.files(f, pattern = ".*\\.(laz|las)$") %>% length()
+# what files are in here?
+list.files(f, pattern = ".*\\.(laz|las)$")[1]
+```
+
+what information does `lidR` read from the catalog?
+
+```{r}
+ctg_temp <- lidR::readLAScatalog(f)
+# set the processing options
+lidR::opt_progress(ctg_temp) <- F
+lidR::opt_filter(ctg_temp) <- "-drop_duplicates"
+lidR::opt_select(ctg_temp) <- "xyziRGB"
+# huh?
+ctg_temp
+```
+
+that's a lot of points...can an ordinary laptop handle it? we'll find out.
+
+We'll plot our point cloud data tiles real quick to orient ourselves
+
+```{r}
+ctg_temp %>% 
+  purrr::pluck("data") %>% 
+  mapview::mapview(popup = F, layer.name = "point cloud tile")
+```
+
+## Check out one pile
+
+```{r}
+las_temp <- lidR::clip_roi(
+  ctg_temp
+  # biggest mechanical
+  , slash_piles_sf %>%
+    dplyr::filter(tolower(comment)=="mechanical pile") %>% 
+    dplyr::arrange(desc(diameter)) %>% 
+    dplyr::slice(1) %>% 
+    sf::st_zm() %>% 
+    sf::st_buffer(10, endCapStyle = "SQUARE") %>% 
+    sf::st_transform(lidR::st_crs(ctg_temp))
+)
+```
+
+what did we get?
+
+```{r}
+las_temp@data %>% dplyr::glimpse()
+```
+
+plot a sample
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+## if want to get current rgl parameters
+# rgl::par3d()$zoom
+# rgl::par3d()$FOV
+# rgl::par3d()$userMatrix %>% c()
+# rgl::par3d()$windowRect
+## set up for printing rgl graphics
+r3dDefaults <- rgl::r3dDefaults
+m  <- structure(c(
+  -0.39951634,0.09665099, -0.91161686,0.00000000, -0.90745372,0.09938181,0.40822852,0.00000000,0.13005376,0.99034417,0.04800174,0.00000000,0.00000000,0.00000000
+,0.00000000,1.00000000
+), .Dim = c(4L, 4L))
+r3dDefaults$FOV <- 30
+r3dDefaults$userMatrix <- m
+r3dDefaults$zoom <- 0.78
+r3dDefaults$windowRect <- c(0,23,1536,864)
+rgl::setupKnitr(autoprint = TRUE)
+```
+
+```{r, rgl = TRUE}
+las_temp %>% 
+  lidR::plot(
+    color = "Z", bg = "white", legend = F
+   , pal = harrypotter::hp(n=50, house = "gryffindor")
+  )
+```
+
+make a gif
+
+```{r}
+library(magick)
+if(!file.exists(file.path("../data/", "pile_z.gif"))){
+  rgl::close3d()
+  lidR::plot(
+    las_temp, color = "Z", bg = "white", legend = F
+   , pal = harrypotter::hp(n=50, house = "gryffindor")
+  )
+  rgl::movie3d( rgl::spin3d(), duration = 10, fps = 10 , movie = "pile_z", dir = "../data/")
+  rgl::close3d()
+}
+```
+
+```{r}
+library(magick)
+if(!file.exists(file.path("../data/", "pile_rgb.gif"))){
+  rgl::close3d()
+  lidR::plot(
+    las_temp, color = "RGB", bg = "white", legend = F
+  )
+  rgl::movie3d( rgl::spin3d(), duration = 10, fps = 10 , movie = "pile_rgb", dir = "../data/")
+  rgl::close3d()
+}
+```
+
+## Load orthomosaic rasters
+
+Orthomosaic `tif` files from the UAS flight imagery that were created in [Agisoft Metashape](https://www.agisoft.com/) are loaded and stitched together via `terra::mosaic`.
+
+```{r ortho-ld, results = 'hide'}
+  # read list of orthos
+  ortho_list_temp = list.files(
+    "D:\\PFDP_Data\\p4pro_images\\P4Pro_06_17_2021_half_half_optimal\\3_dsm_ortho\\2_mosaic"
+    , pattern = "*\\.(tif|tiff)$", full.names = T)[] %>% 
+    purrr::map(function(x){terra::rast(x)})
+  
+  # ortho_list_temp[[1]] %>%
+  #   terra::aggregate(20) %>%
+  #   terra::plotRGB(r = 1, g = 2, b = 3, stretch = "hist", colNA = "transparent")
+  
+  ####### ensure the resolution of the rasters matches 
+    # terra::res(ortho_list_temp[[1]])
+    
+    ## function
+    change_res_fn = function(r, my_res=1){
+      r2 = r
+      terra::res(r2) = my_res
+      r2 = terra::resample(r, r2)
+      return(r2)
+    }
+    ## apply the function
+    ortho_list_temp = 1:length(ortho_list_temp) %>% 
+      purrr::map(function(x){change_res_fn(ortho_list_temp[[x]], my_res=0.25)})
+    
+    # terra::res(ortho_list_temp[[1]])
+    
+    # ortho_list_temp[[1]] %>%
+    #   terra::aggregate(2) %>%
+    #   terra::plotRGB(r = 1, g = 2, b = 3, stretch = "hist", colNA = "transparent")
+
+  ######## mosaic the raster list 
+    ortho_rast = terra::mosaic(
+      terra::sprc(ortho_list_temp)
+      , fun = "min" # min only thing that works
+    ) 
+    
+  # ortho_rast %>%
+  #   terra::aggregate(4) %>%
+  #   terra::plotRGB(r = 1, g = 2, b = 3, stretch = "lin", colNA = "transparent")
+```
+
+ortho plot fn
+
+```{r}
+######################################################################################
+# function to plot ortho + stand
+######################################################################################
+ortho_plt_fn = function(stand = las_ctg_dta %>% sf::st_union() %>% sf::st_as_sf()){
+# convert to stars
+  ortho_st <- ortho_rast %>%  
+    terra::subset(subset = c(1,2,3)) %>%
+    terra::crop(
+      stand %>% sf::st_buffer(20) %>% terra::vect()
+    ) %>% 
+    terra::aggregate(fact = 2, fun = "mean", na.rm = T) %>% 
+    stars::st_as_stars()
+  
+  # convert to rgb
+  ortho_rgb <- stars::st_rgb(
+    ortho_st[,,,1:3]
+    , dimension = 3
+    , use_alpha = FALSE
+    # , stretch = "histogram"
+    , probs = c(0.005, 0.995)
+    , stretch = "percent"
+  )
+  # ggplot
+  plt_rgb <- ggplot() +
+    stars::geom_stars(data = ortho_rgb[]) +
+    scale_fill_identity(na.value = "transparent") + # !!! don't take this out or RGB plot will kill your computer
+    scale_x_continuous(expand = c(0, 0)) +
+    scale_y_continuous(expand = c(0, 0)) +
+    labs(
+      x = ""
+      , y = ""
+    ) +
+    theme_void()
+  
+  # return(plt_rgb)
+  # combine all plot elements
+  plt_combine = plt_rgb +
+    # geom_sf(
+    #   data = stand
+    #   , alpha = 0
+    #   , lwd = 1.5
+    #   , color = "gray22"
+    # ) +
+    theme(
+      legend.position = "top" # c(0.5,1)
+      , legend.direction = "horizontal"
+      , legend.margin = margin(0,0,0,0)
+      , legend.text = element_text(size = 8)
+      , legend.title = element_text(size = 8)
+      , legend.key = element_rect(fill = "white")
+      # , plot.title = ggtext::element_markdown(size = 10, hjust = 0.5)
+      , plot.title = element_text(size = 10, hjust = 0.5, face = "bold")
+      , plot.subtitle = element_text(size = 8, hjust = 0.5, face = "italic")
+    )
+  return(plt_combine)
+}
+```
+
+plot
+
+```{r}
+stand_temp = slash_piles_sf %>%
+    dplyr::filter(tolower(comment)=="mechanical pile") %>% 
+    dplyr::arrange(desc(diameter)) %>% 
+    dplyr::slice(1) %>% 
+    sf::st_zm() %>% 
+    sf::st_buffer(10, endCapStyle = "SQUARE") %>% 
+    sf::st_transform(terra::crs(ortho_rast))
+# check it with the ortho
+ortho_plt_fn(stand = stand_temp)
+ggsave("../data/pile_rgb.jpeg", height = 5, width = 5)
+```
+
+GRVI ?
+
+```{r}
+grvi_rast <- (ortho_rast[[2]]-ortho_rast[[1]])/(ortho_rast[[2]]+ortho_rast[[1]])
+terra::plot(grvi_rast)
+# check it with the ortho
+grvi_rast %>% 
+  terra::crop(
+    slash_piles_sf %>%
+    dplyr::filter(tolower(comment)=="mechanical pile") %>% 
+    dplyr::arrange(desc(diameter)) %>% 
+    dplyr::slice(1) %>% 
+    sf::st_zm() %>% 
+    sf::st_buffer(30, endCapStyle = "SQUARE") %>% 
+    sf::st_transform(terra::crs(ortho_rast))
+  ) %>% 
+  terra::as.data.frame(xy=T) %>% 
+  dplyr::rename(f=3) %>% 
+  ggplot2::ggplot() +
+  ggplot2::geom_tile(ggplot2::aes(x=x,y=y,fill = f), color = NA) +
+  ggplot2::labs(fill="CHM (m)") +
+  # harrypotter::scale_fill_hp("slytherin") +
+  scale_fill_gradient2(low = "black", high = "forestgreen") +
+  scale_x_continuous(expand = c(0, 0)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ggplot2::theme_void() +
+  theme(
+      legend.position = "none" # c(0.5,1)
+      , legend.direction = "horizontal"
+      , legend.margin = margin(0,0,0,0)
+      , legend.text = element_text(size = 8)
+      , legend.title = element_text(size = 8)
+      , legend.key = element_rect(fill = "white")
+      # , plot.title = ggtext::element_markdown(size = 10, hjust = 0.5)
+      , plot.title = element_text(size = 10, hjust = 0.5, face = "bold")
+      , plot.subtitle = element_text(size = 8, hjust = 0.5, face = "italic")
+    )
+
+ggsave("../data/pile_grvi.jpeg", height = 5, width = 5)
+```
+
