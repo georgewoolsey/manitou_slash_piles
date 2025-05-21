@@ -177,13 +177,13 @@ if(!file.exists(file.path("../data/", "pile_rgb.gif"))){
 }
 ```
 
-## Load orthomosaic rasters
+## Load RGB orthomosaic rasters
 
 Orthomosaic `tif` files from the UAS flight imagery that were created in [Agisoft Metashape](https://www.agisoft.com/) are loaded and stitched together via `terra::mosaic`.
 
 ```{r ortho-ld, results = 'hide'}
   # read list of orthos
-  ortho_list_temp = list.files(
+  ortho_list_temp <- list.files(
     "D:\\PFDP_Data\\p4pro_images\\P4Pro_06_17_2021_half_half_optimal\\3_dsm_ortho\\2_mosaic"
     , pattern = "*\\.(tif|tiff)$", full.names = T)[] %>% 
     purrr::map(function(x){terra::rast(x)})
@@ -196,14 +196,14 @@ Orthomosaic `tif` files from the UAS flight imagery that were created in [Agisof
     # terra::res(ortho_list_temp[[1]])
     
     ## function
-    change_res_fn = function(r, my_res=1){
-      r2 = r
-      terra::res(r2) = my_res
-      r2 = terra::resample(r, r2)
+    change_res_fn <- function(r, my_res=1){
+      r2 <- r
+      terra::res(r2) <- my_res
+      r2 <- terra::resample(r, r2)
       return(r2)
     }
     ## apply the function
-    ortho_list_temp = 1:length(ortho_list_temp) %>% 
+    ortho_list_temp <- 1:length(ortho_list_temp) %>% 
       purrr::map(function(x){change_res_fn(ortho_list_temp[[x]], my_res=0.25)})
     
     # terra::res(ortho_list_temp[[1]])
@@ -213,7 +213,7 @@ Orthomosaic `tif` files from the UAS flight imagery that were created in [Agisof
     #   terra::plotRGB(r = 1, g = 2, b = 3, stretch = "hist", colNA = "transparent")
 
   ######## mosaic the raster list 
-    ortho_rast = terra::mosaic(
+    ortho_rast <- terra::mosaic(
       terra::sprc(ortho_list_temp)
       , fun = "min" # min only thing that works
     ) 
@@ -229,12 +229,12 @@ ortho plot fn
 ######################################################################################
 # function to plot ortho + stand
 ######################################################################################
-ortho_plt_fn = function(stand = las_ctg_dta %>% sf::st_union() %>% sf::st_as_sf()){
+ortho_plt_fn = function(stand = las_ctg_dta %>% sf::st_union() %>% sf::st_as_sf(), buffer = 20){
 # convert to stars
   ortho_st <- ortho_rast %>%  
     terra::subset(subset = c(1,2,3)) %>%
     terra::crop(
-      stand %>% sf::st_buffer(20) %>% terra::vect()
+      stand %>% sf::st_buffer(buffer) %>% terra::vect()
     ) %>% 
     terra::aggregate(fact = 2, fun = "mean", na.rm = T) %>% 
     stars::st_as_stars()
@@ -277,14 +277,14 @@ ortho_plt_fn = function(stand = las_ctg_dta %>% sf::st_union() %>% sf::st_as_sf(
       , legend.title = element_text(size = 8)
       , legend.key = element_rect(fill = "white")
       # , plot.title = ggtext::element_markdown(size = 10, hjust = 0.5)
-      , plot.title = element_text(size = 10, hjust = 0.5, face = "bold")
-      , plot.subtitle = element_text(size = 8, hjust = 0.5, face = "italic")
+      , plot.title = element_text(size = 8, hjust = 0.5, face = "bold")
+      , plot.subtitle = element_text(size = 6, hjust = 0.5, face = "italic")
     )
   return(plt_combine)
 }
 ```
 
-plot
+plot an example slash pile RGB image
 
 ```{r}
 stand_temp = slash_piles_sf %>%
@@ -299,22 +299,32 @@ ortho_plt_fn(stand = stand_temp)
 ggsave("../data/pile_rgb.jpeg", height = 5, width = 5)
 ```
 
-GRVI ?
+### Example ratio-based index
+
+let’s define a general function for a ratio based (vegetation) index
 
 ```{r}
-grvi_rast <- (ortho_rast[[2]]-ortho_rast[[1]])/(ortho_rast[[2]]+ortho_rast[[1]])
+spectral_index_fn <- function(rast, layer1, layer2) {
+  bk <- rast[[layer1]]
+  bi <- rast[[layer2]]
+  vi <- (bk - bi) / (bk + bi)
+  return(vi)
+}
+```
+
+The Green-Red Vegetation Index (GRVI) uses the reflectance of green and red bands to assess vegetation health and identify ground cover types. The formula is GRVI = (green - red) / (green + red). Higher GRVI values indicate healthy vegetation, while negative values suggest soils, and values near zero may indicate water or snow.
+
+```{r}
+grvi_rast <- spectral_index_fn(rast = ortho_rast, layer1 = 2, layer2 = 1)
 terra::plot(grvi_rast)
+```
+
+let's check the GRVI for a pile
+
+```{r}
 # check it with the ortho
 grvi_rast %>% 
-  terra::crop(
-    slash_piles_sf %>%
-    dplyr::filter(tolower(comment)=="mechanical pile") %>% 
-    dplyr::arrange(desc(diameter)) %>% 
-    dplyr::slice(1) %>% 
-    sf::st_zm() %>% 
-    sf::st_buffer(30, endCapStyle = "SQUARE") %>% 
-    sf::st_transform(terra::crs(ortho_rast))
-  ) %>% 
+  terra::crop(stand_temp %>% sf::st_buffer(20)) %>% 
   terra::as.data.frame(xy=T) %>% 
   dplyr::rename(f=3) %>% 
   ggplot2::ggplot() +
@@ -339,4 +349,91 @@ grvi_rast %>%
 
 ggsave("../data/pile_grvi.jpeg", height = 5, width = 5)
 ```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE, include=FALSE}
+remove(list = ls()[grep("_temp",ls())])
+remove(f, r3dDefaults, m)
+gc()
+```
+
+## Study area imagery
+
+let's look at the RGB imagery and pile locations
+
+```{r}
+# get the base plot
+plt_rgb_ortho <- ortho_plt_fn(
+  slash_piles_sf %>% 
+  sf::st_bbox() %>% 
+  sf::st_as_sfc() %>% 
+  sf::st_buffer(50) %>% 
+  sf::st_transform(terra::crs(ortho_rast))
+)
+# add pile locations
+plt_rgb_ortho +
+  ggplot2::geom_sf(
+    data = slash_piles_sf %>% sf::st_transform(terra::crs(ortho_rast))
+    , ggplot2::aes() # size = diameter
+    , shape = 1
+    , color = "firebrick"
+  ) +
+  ggplot2::theme(legend.position = "none")
+```
+
+notice these are point measurements of plot locations and the points are not precisely in the center of the pile. notice also there are piles in the imagery that were not measured (e.g. upper-left corner)
+
+let's make a panel of plots for each pile
+
+```{r}
+p_fn_temp <- function(rn, df = slash_piles_sf, buff = 6.5, crs = terra::crs(ortho_rast)) {
+  # scale the buffer based on the largest
+  sc <- buff/max(df$diameter, na.rm = T)
+  d <- df %>%
+    dplyr::arrange(tolower(comment), desc(diameter)) %>% 
+    dplyr::slice(rn) %>% 
+    sf::st_zm() 
+  d <- d  %>% 
+    sf::st_buffer(
+      dplyr::case_when(
+        is.null(d$diameter) | is.na(d$diameter) ~ buff
+        , d$diameter <= 0 ~ buff
+        , T ~ sc*d$diameter
+      )
+      , endCapStyle = "ROUND"
+    ) %>% 
+    sf::st_transform(crs)
+  # plt
+  ortho_plt_fn(d) + 
+    ggplot2::geom_sf(data = d, fill = NA, color = "firebrick") +
+    ggplot2::labs(
+      subtitle = paste0(
+        tolower(d$comment)
+        , "\ndiam. = "
+        , scales::comma(d$diameter, accuracy = 0.1)
+        # , ", ht. = "
+        # , scales::comma(d$height, accuracy = 0.1)
+      )
+    )
+}
+# add pile locations
+plt_list_rgb <- 1:nrow(slash_piles_sf) %>% 
+  purrr::map(p_fn_temp)
+```
+
+plot tiles 
+
+```{r, height = 10.5, width = 8}
+patchwork::wrap_plots(
+  sample(
+    plt_list_rgb, size = as.integer(nrow(slash_piles_sf)/3))
+  , ncol = 5
+)
+ggsave("../data/pile_tiles_rgb.jpeg", height = 10.5, width = 8)
+```
+
+we have point locations of piles. object-based image analysis will require polygon data so that we have sets of pixels (i.e. "objects") to work with for training our model.
+
+notice that defining the pile "objects" with this point data is going to be challenging given the point locations appear to not have been measured at the center of each pile. if they had, we could use the point location and then buffer by the pile diameter to get the pile extent.
+
+another challenge will be training a model with the different lighting conditions in the imagery (e.g. piles in shadows or under tree crowns)
 

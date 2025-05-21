@@ -1,0 +1,188 @@
+# RGB Classification
+
+We'll use the RGB imagery alone to explore unsupervised and supervised classification algorithms.
+
+Ultimately, it is likely we will use an object-based image analysis (OBIA) approach. OBIA is a technique (or a set of techniques) used to analyze digital images that was developed relatively recently in comparison to ‘classic’ pixel-based image approaches ([Burnett and Blaschke 2003](https://doi.org/10.1016/S0304-3800(03)00139-X)). We will probably implement the OBIA approach using the `SegOptim` [package](https://github.com/joaofgoncalves/SegOptim) presented by [Goncalves et al. (2019)](https://doi.org/10.1016/j.jag.2018.11.011)
+
+In future sections we will explore, integration of spectral data with the 3D point cloud data (i.e. "data fusion") to test distinguishing the woody material in slash piles from surrounding vegetation or soil. Field-measured slash piles will be used as the ground truth data to perform a confusion matrix-based validation accuracy assessment of the methods.
+
+[Norton et al. (2022)](https://doi.org/10.3390/rs14122896) combined LiDAR and hyperspectral data in a data fusion approach for classification of semi-arid woody cover species and achieved accuracies ranging from 86% to 98% for five woody species
+
+We'll see how far we can get without hyperspectral data since this data is less common
+
+## Unsupervised classification
+
+Unsupervised image classification could be used to identify slash piles by grouping pixels with similar spectral characteristics. We'll call any method that implements classification at the pixel level like the unsupervised classification approach tested here "pixel-based image analysis" versus to OBIA. Unsupervised image classification uses algorithms like K-means to find natural clusters within spectral data and can use other inputs like elevation or spectral indices. This method operates without requiring pre-defined training data, making it useful when field data is limited. The output assigns each pixel to a class, which the user then interprets to potentially identify slash piles based on their distinct spectral signatures and elevated height. While effective for initial classification and pattern recognition, unsupervised methods can produce numerous classes that require manual interpretation and may be less accurate than supervised approaches without ground truth data.
+
+let's test it out and see what we get
+
+### Textural covariates
+
+[Rodman et al. (2019)](https://doi.org/10.1002/ecs2.2594) described a method using a series of image processing steps to add supplemental information describing the texture and context surrounding each image pixel in their analysis of forest cover change based only on panchromatic imagery (i.e. "black and white"). These textural covariates may be helpful for identifying slash piles, especially if we only have RGB data.
+
+first, we'll make a single panchromatic band (the mean of red, green, and blue values) from our RGB imagery
+
+```{r}
+rgb_to_pan_fn <- function(r, g, b) {
+  pan <- (r + g + b)/3
+  # replace all 0's with na
+  pan <- terra::subst(pan, from = 0, to = NA)
+  return(pan)
+}
+panchromatic_rast <- rgb_to_pan_fn(
+  ortho_rast[[1]], ortho_rast[[2]], ortho_rast[[3]]
+)
+```
+
+quick plot
+
+```{r}
+terra::plot(panchromatic_rast, col = scales::pal_grey(0, 1)(100))
+```
+
+nice, now we'll make the textural covariates described by [Rodman et al. (2019)](https://doi.org/10.1002/ecs2.2594)
+
+>During these steps, we identified locally dark pixels (indicative of individual trees surrounded by bright grassland) and quantified local standard deviation in brightness using moving windows at multiple scales (sensu Coburn and Roberts 2004; Fig. 3; Appendix S2). We combined these two layers with the original grayscale imagery to create three-band composite imagery (Fig. 3d). The combination of brightness, local minima, and standard deviation emphasizes differences in spectral reflectance that facilitate the separation of different forest structures (e.g., individual trees and dense stands) from non-forested areas. (p. 7)
+
+and from Appendix S2
+
+>Our first metric identifies pixels that are darker than their surroundings (hereafter "local minima"). To identify local minima, we calculated the mean and standard deviation of pixel brightness at each scale (3-15 pixel windows). A pixel was considered to be darker than its surroundings if its brightness value was lower than the window mean minus two standard deviations. These calculations were made for each window size for each pixel, then summed across all window sizes (thus, local minima values range 0-7, where 7 indicates that a pixel is darker than its surroundings across all moving window sizes; Fig. 3b) 
+
+>For the second metric, we calculated the sum of standard deviation values across all window sizes (Fig. 3c). Standard deviation of pixel brightness is a simple version of local texture that can improve forest classification in high-resolution imagery. While standard deviation is more computationally efficient than many other texture metrics (e.g., entropy based on greylevel co-occurrence matrices), it may still yield comparable performance in classification (Coburn and Roberts 2004). Standard deviation appeared helpful in separating dark forest stands (low brightness, moderate variance) from more homogenous areas (low brightness, low variance; i.e., water bodies, shadows). 
+
+>We combined these three layers (brightness, local minima, and standard deviation) to create a three-band composite image (Fig. 3d). We completed these image processing steps in Python 2.7 using the GDAL (Geospatial Data Abstraction Library 2017), SciPy (Oliphant 2007), and NumPy (Hugunin 1995) modules. NAIP imagery was processed similarly (minima and standard deviation calculated using a greyscale image of the average brightness across all bands).
+
+
+
+```{r, include=FALSE, eval=TRUE}
+round_to_nearest_odd <- function(x) {
+  if (x%%2 == 0) { # Check if the number is even
+    return(x + 1) # Round up to the next odd number if it's even
+  } else {
+    return(x) # Return the number itself if it's already odd
+  }
+}
+round_to_nearest_odd((c(3,5,7,9,11,13,15)*1))
+```
+
+
+```{r}
+rast_rodmanetal2019_fn <- function(
+    rast, windows_m = c(3,5,7,9,11,13,15), scale_to_1m = T
+) {
+  rast <- rast[[1]]
+  
+  # scale the windows based on resolution
+  if(scale_to_1m){
+    windows_m <- round_to_nearest_odd(
+      (1/terra::res(rast)[1])*windows_m
+    )
+  }else{
+    windows_m <- windows_m #round_to_nearest_odd(windows_m)
+  }
+  
+  # means
+  r_means <- windows_m %>% 
+    purrr::map(\(w)
+      terra::focal(x = rast, w = w, fun = "mean", na.rm = T)
+    )
+  # r_means[[7]] %>% terra::plot(col = scales::pal_grey(0, 1)(100))
+  
+  # sds
+  r_sds <- windows_m %>% 
+    purrr::map(\(w)
+      terra::focal(x = rast, w = w, fun = "sd", na.rm = T)
+    )
+  # r_sds[[5]] %>% terra::plot(col = scales::pal_grey(0, 1)(100))
+  
+  # local min
+  local_min_fn <- function(rast, mean, sd) {
+    as.numeric(rast < ( mean-(sd*2) ))
+  }
+  
+  r_local_min <- 1:length(r_means) %>% 
+    purrr::map(\(i)
+      local_min_fn(rast = rast, mean = r_means[[i]], sd = r_sds[[i]])
+    )
+  # r_local_min[[5]] %>% terra::plot()
+  
+  # aggregate local min
+  r_local_min_agg <- terra::rast(r_local_min) %>% 
+    cumsum()
+  
+  # get the last of the local mins
+  local_minima <- r_local_min_agg[[terra::nlyr(r_local_min_agg)]]
+  
+  # aggregate local sd
+  r_sds_agg <- terra::rast(r_sds) %>% 
+    cumsum()
+  
+  # get the last of the local mins
+  local_sd <- r_sds_agg[[terra::nlyr(r_sds_agg)]]
+  
+  return(list(
+    local_minima = local_minima
+    , local_sd = local_sd
+    , composite = c(rast, local_minima, local_sd)
+  ))
+}
+```
+
+implement our `rast_rodmanetal2019_fn` function
+```{r}
+local_minima_rast <- rast_rodmanetal2019_fn(
+  rast = panchromatic_rast, scale_to_1m = F
+)
+```
+
+plots 
+
+```{r}
+# plot
+terra::plot(local_minima_rast$local_minima, col = scales::pal_grey(0, 1)(8))
+terra::plot(local_minima_rast$local_sd, col = scales::pal_grey(0, 1)(100))
+
+# composite
+local_minima_rast$composite %>% terra::summary()
+
+local_minima_rast$composite %>% 
+  terra::subset(subset = c(1,2,3)) %>%
+  terra::aggregate(fact = 2, fun = "mean", na.rm = T) %>% 
+  terra::plotRGB(
+    r = 1, g = 3, b = 2
+    , scale = c(255,7,520)
+    , stretch = "hist", colNA = "transparent"
+  )
+#   terra::aggregate(4) %>%
+
+```
+
+```{r}
+# convert to stars
+  ortho_st <- local_minima_rast$composite %>%  
+    terra::subset(subset = c(1,2,3)) %>%
+    terra::aggregate(fact = 2, fun = "mean", na.rm = T) %>% 
+    stars::st_as_stars()
+  
+  # convert to rgb
+  ortho_rgb <- stars::st_rgb(
+    ortho_st[,,,1:3]
+    , dimension = 3
+    , use_alpha = FALSE
+    # , stretch = "histogram"
+    , probs = c(0.005, 0.995)
+    , stretch = "percent"
+  )
+  # ggplot
+  ggplot() +
+    stars::geom_stars(data = ortho_rgb[]) +
+    scale_fill_identity(na.value = "transparent") + # !!! don't take this out or RGB plot will kill your computer
+    scale_x_continuous(expand = c(0, 0)) +
+    scale_y_continuous(expand = c(0, 0)) +
+    labs(
+      x = ""
+      , y = ""
+    ) +
+    theme_void()
+```
+
