@@ -218,6 +218,8 @@ Orthomosaic `tif` files from the UAS flight imagery that were created in [Agisof
       , fun = "min" # min only thing that works
     ) 
     
+    names(ortho_rast) <- c("red","green","blue","alpha")
+    
   # ortho_rast %>%
   #   terra::aggregate(4) %>%
   #   terra::plotRGB(r = 1, g = 2, b = 3, stretch = "lin", colNA = "transparent")
@@ -236,7 +238,7 @@ ortho_plt_fn = function(stand = las_ctg_dta %>% sf::st_union() %>% sf::st_as_sf(
     terra::crop(
       stand %>% sf::st_buffer(buffer) %>% terra::vect()
     ) %>% 
-    terra::aggregate(fact = 2, fun = "mean", na.rm = T) %>% 
+    # terra::aggregate(fact = 2, fun = "mean", na.rm = T) %>% 
     stars::st_as_stars()
   
   # convert to rgb
@@ -316,6 +318,7 @@ The Green-Red Vegetation Index (GRVI) uses the reflectance of green and red band
 
 ```{r}
 grvi_rast <- spectral_index_fn(rast = ortho_rast, layer1 = 2, layer2 = 1)
+names(grvi_rast) <- c("grvi")
 terra::plot(grvi_rast)
 ```
 

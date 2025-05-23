@@ -10,13 +10,7 @@ In future sections we will explore, integration of spectral data with the 3D poi
 
 We'll see how far we can get without hyperspectral data since this data is less common
 
-## Unsupervised classification
-
-Unsupervised image classification could be used to identify slash piles by grouping pixels with similar spectral characteristics. We'll call any method that implements classification at the pixel level like the unsupervised classification approach tested here "pixel-based image analysis" versus to OBIA. Unsupervised image classification uses algorithms like K-means to find natural clusters within spectral data and can use other inputs like elevation or spectral indices. This method operates without requiring pre-defined training data, making it useful when field data is limited. The output assigns each pixel to a class, which the user then interprets to potentially identify slash piles based on their distinct spectral signatures and elevated height. While effective for initial classification and pattern recognition, unsupervised methods can produce numerous classes that require manual interpretation and may be less accurate than supervised approaches without ground truth data.
-
-let's test it out and see what we get
-
-### Textural covariates
+## Textural covariates
 
 [Rodman et al. (2019)](https://doi.org/10.1002/ecs2.2594) described a method using a series of image processing steps to add supplemental information describing the texture and context surrounding each image pixel in their analysis of forest cover change based only on panchromatic imagery (i.e. "black and white"). These textural covariates may be helpful for identifying slash piles, especially if we only have RGB data.
 
@@ -37,7 +31,11 @@ panchromatic_rast <- rgb_to_pan_fn(
 quick plot
 
 ```{r}
-terra::plot(panchromatic_rast, col = scales::pal_grey(0, 1)(100))
+terra::plot(
+  panchromatic_rast
+  , col = scales::pal_grey(0, 1)(100)
+  , axes=F, legend = F
+)
 ```
 
 nice, now we'll make the textural covariates described by [Rodman et al. (2019)](https://doi.org/10.1002/ecs2.2594)
@@ -50,19 +48,36 @@ and from Appendix S2
 
 >For the second metric, we calculated the sum of standard deviation values across all window sizes (Fig. 3c). Standard deviation of pixel brightness is a simple version of local texture that can improve forest classification in high-resolution imagery. While standard deviation is more computationally efficient than many other texture metrics (e.g., entropy based on greylevel co-occurrence matrices), it may still yield comparable performance in classification (Coburn and Roberts 2004). Standard deviation appeared helpful in separating dark forest stands (low brightness, moderate variance) from more homogenous areas (low brightness, low variance; i.e., water bodies, shadows). 
 
->We combined these three layers (brightness, local minima, and standard deviation) to create a three-band composite image (Fig. 3d). We completed these image processing steps in Python 2.7 using the GDAL (Geospatial Data Abstraction Library 2017), SciPy (Oliphant 2007), and NumPy (Hugunin 1995) modules. NAIP imagery was processed similarly (minima and standard deviation calculated using a greyscale image of the average brightness across all bands).
-
+>We combined these three layers (brightness, local minima, and standard deviation) to create a three-band composite image (Fig. 3d)
 
 
 ```{r, include=FALSE, eval=TRUE}
 round_to_nearest_odd <- function(x) {
-  if (x%%2 == 0) { # Check if the number is even
-    return(x + 1) # Round up to the next odd number if it's even
-  } else {
-    return(x) # Return the number itself if it's already odd
-  }
+  rounded_int <- round(x)
+
+  # Step 2: Check if the rounded integer is already odd.
+  is_odd <- (rounded_int %% 2 != 0)
+
+  # Step 3: For numbers that rounded to an even integer, find the nearest odd.
+  odd_down <- rounded_int - 1
+  odd_up <- rounded_int + 1
+
+  # Calculate the absolute distances from the original number 'x'
+  dist_down <- abs(x - odd_down)
+  dist_up <- abs(x - odd_up)
+
+  # Step 4: Use ifelse for vectorized conditional logic.
+  result <- ifelse(is_odd,
+                   rounded_int, # If the initially rounded integer is odd, use it.
+                   ifelse(dist_down < dist_up,
+                          odd_down, # If 'odd_down' is strictly closer.
+                          odd_up    # If 'odd_up' is closer or equidistant.
+                   )
+  )
+
+  return(result)
 }
-round_to_nearest_odd((c(3,5,7,9,11,13,15)*1))
+# round_to_nearest_odd(c(3.5, 4.2, 6.1, 7))
 ```
 
 
@@ -78,7 +93,7 @@ rast_rodmanetal2019_fn <- function(
       (1/terra::res(rast)[1])*windows_m
     )
   }else{
-    windows_m <- windows_m #round_to_nearest_odd(windows_m)
+    windows_m <- round_to_nearest_odd(windows_m)
   }
   
   # means
@@ -120,69 +135,246 @@ rast_rodmanetal2019_fn <- function(
   # get the last of the local mins
   local_sd <- r_sds_agg[[terra::nlyr(r_sds_agg)]]
   
+  # composite
+  composite <- c(rast, local_sd, local_minima)
+  names(composite) <- c("panchromatic", "local_sd", "local_minima")
+  
+  # names
+  names(local_minima) <- c("local_minima")
+  names(local_sd) <- c("local_sd")
+  
   return(list(
     local_minima = local_minima
     , local_sd = local_sd
-    , composite = c(rast, local_minima, local_sd)
+    , composite = composite
   ))
 }
 ```
 
 implement our `rast_rodmanetal2019_fn` function
 ```{r}
-local_minima_rast <- rast_rodmanetal2019_fn(
+rodmanetal2019_rast <- rast_rodmanetal2019_fn(
   rast = panchromatic_rast, scale_to_1m = F
 )
 ```
 
-plots 
+plot of "local minima" pixels that are darker than their surroundings
 
 ```{r}
 # plot
-terra::plot(local_minima_rast$local_minima, col = scales::pal_grey(0, 1)(8))
-terra::plot(local_minima_rast$local_sd, col = scales::pal_grey(0, 1)(100))
+terra::plot(
+  rodmanetal2019_rast$local_minima
+  , col = scales::pal_grey(0, 1)(8)
+  , axes=F, legend = F
+)
+```
 
-# composite
-local_minima_rast$composite %>% terra::summary()
+plot of standard deviation pixel brightness which is a simple version of local texture that can improve forest classification in high-resolution imagery
 
-local_minima_rast$composite %>% 
-  terra::subset(subset = c(1,2,3)) %>%
-  terra::aggregate(fact = 2, fun = "mean", na.rm = T) %>% 
-  terra::plotRGB(
-    r = 1, g = 3, b = 2
-    , scale = c(255,7,520)
-    , stretch = "hist", colNA = "transparent"
+```{r}
+terra::plot(
+  rodmanetal2019_rast$local_sd
+  , col = scales::pal_grey(0, 1)(100)
+  , axes=F, legend = F
+)
+```
+
+plot of these combined panchromatic, local minima, and standard deviation images were merged to create a three-band composite which can be segmented to identify areas of relatively homogeneous brightness, contrast, and variance
+
+```{r}
+terra::plotRGB(
+  rodmanetal2019_rast$composite
+  # , scale = c(255,7,520)
+  , stretch = "hist", colNA = "transparent"
+)
+```
+
+
+## Unsupervised classification
+
+Unsupervised image classification could be used to identify slash piles by grouping pixels with similar spectral characteristics. We'll call any method that implements classification at the pixel level like the unsupervised classification approach tested here "pixel-based image analysis" versus to OBIA. Unsupervised image classification uses algorithms like K-means to find natural clusters within spectral data and can use other inputs like elevation or spectral indices. This method operates without requiring pre-defined training data, making it useful when field data is limited. The output assigns each pixel to a class, which the user then interprets to potentially identify slash piles based on their distinct spectral signatures and elevated height. While effective for initial classification and pattern recognition, unsupervised methods can produce numerous classes that require manual interpretation and may be less accurate than supervised approaches without ground truth data.
+
+let's test it out and see what we get
+
+first, we'll convert our rasters to a data frame
+
+```{r}
+# combine rasters as data frame
+pred_df <- terra::as.data.frame(
+    c(
+      terra::subset(ortho_rast, c("red","green","blue"))
+      , rodmanetal2019_rast$composite
+      , grvi_rast
+    )
+    , xy = T
+    , cell = T
+  ) %>% 
+  dplyr::mutate(
+    dplyr::across(
+      .cols = c(red,green,blue)
+      , .fns = ~ ifelse(.x==0,NA,.x)
+    )
+  ) %>% 
+  # we can't have NA values in kmeans
+  dplyr::mutate(
+    dplyr::across(
+      .cols = dplyr::everything()
+      , .fns = ~ as.numeric(ifelse(is.na(.x),-99,.x))
+    )
   )
-#   terra::aggregate(4) %>%
+# what is this data?
+pred_df %>% dplyr::slice_sample(n=100) %>% dplyr::glimpse()
+```
 
+perform kmeans clustering
+
+```{r}
+set.seed(111)
+# Create 10 clusters, allow 500 iterations, start with 5 random sets using "Lloyd"
+kmncluster <- stats::kmeans(
+  pred_df %>% dplyr::select(-c(cell,x,y))
+  , centers=10
+  , iter.max = 500
+  , nstart = 5
+  , algorithm="Lloyd"
+)
+# kmeans returns an object of class kmeans
+str(kmncluster)
+```
+
+put the kmeans clusters into a raster
+
+```{r}
+# make a blank raster
+kmeans_cluster_rast <- terra::rast(ortho_rast, nlyr=1)
+# fill the raster
+kmeans_cluster_rast[pred_df$cell] <- kmncluster$cluster
+# what?
+kmeans_cluster_rast
+```
+
+there should be at most 10 clusters
+
+```{r}
+terra::freq(kmeans_cluster_rast)
+```
+
+plot the kmeans unsupervised classfication result
+
+```{r}
+terra::plot(
+  kmeans_cluster_rast
+  , col = viridis::turbo(n=10)
+  , axes=F, legend = F
+)
+```
+
+neat, let's see if the piles are classified by making a custom function to plot the classified raster and RGB side-by-side
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE, include=FALSE}
+remove(list = ls()[grep("_temp",ls())])
+gc()
 ```
 
 ```{r}
-# convert to stars
-  ortho_st <- local_minima_rast$composite %>%  
-    terra::subset(subset = c(1,2,3)) %>%
-    terra::aggregate(fact = 2, fun = "mean", na.rm = T) %>% 
-    stars::st_as_stars()
-  
-  # convert to rgb
-  ortho_rgb <- stars::st_rgb(
-    ortho_st[,,,1:3]
-    , dimension = 3
-    , use_alpha = FALSE
-    # , stretch = "histogram"
-    , probs = c(0.005, 0.995)
-    , stretch = "percent"
-  )
-  # ggplot
-  ggplot() +
-    stars::geom_stars(data = ortho_rgb[]) +
-    scale_fill_identity(na.value = "transparent") + # !!! don't take this out or RGB plot will kill your computer
-    scale_x_continuous(expand = c(0, 0)) +
-    scale_y_continuous(expand = c(0, 0)) +
-    labs(
-      x = ""
-      , y = ""
-    ) +
-    theme_void()
+p_fn_temp <- function(
+    rn
+    , df = slash_piles_sf
+    , cluster_rast = kmeans_cluster_rast
+    , buff = 6.5, crs = terra::crs(ortho_rast)
+) {
+  # scale the buffer based on the largest
+    sc_temp <- buff/max(df$diameter, na.rm = T)
+    d_temp <- df %>%
+      dplyr::arrange(tolower(comment), desc(diameter)) %>% 
+      dplyr::slice(rn) %>% 
+      sf::st_zm() 
+    d_temp <- d_temp  %>% 
+      sf::st_buffer(
+        dplyr::case_when(
+          is.null(d_temp$diameter) | is.na(d_temp$diameter) ~ buff
+          , d_temp$diameter <= 0 ~ buff
+          , T ~ sc_temp*d_temp$diameter
+        )
+        , endCapStyle = "ROUND"
+      ) %>% 
+      sf::st_transform(crs)
+    # plt
+    rgb_temp <-
+      ortho_plt_fn(d_temp) + 
+      ggplot2::geom_sf(data = d_temp, fill = NA, color = "white", lwd = 1)
+    
+    # plt classifier
+    class_temp <- ggplot2::ggplot() +
+      ggplot2::geom_tile(
+        data = cluster_rast %>%  
+          terra::crop(
+            d_temp %>% sf::st_buffer(20) %>% terra::vect()
+          ) %>% 
+          terra::as.data.frame(xy=T) %>% 
+          dplyr::rename(f=3)
+        , ggplot2::aes(x=x,y=y,fill=as.factor(f))
+      ) +
+      ggplot2::geom_sf(data = d_temp, fill = NA, color = "white", lwd = 1) +
+      ggplot2::scale_fill_manual(
+        values = c(
+          "1" = viridis::turbo(n=10)[1]
+          , "2" = viridis::turbo(n=10)[2]
+          , "3" = viridis::turbo(n=10)[3]
+          , "4" = viridis::turbo(n=10)[4]
+          , "5" = viridis::turbo(n=10)[5]
+          , "6" = viridis::turbo(n=10)[6]
+          , "7" = viridis::turbo(n=10)[7]
+          , "8" = viridis::turbo(n=10)[8]
+          , "9" = viridis::turbo(n=10)[9]
+          , "10" = viridis::turbo(n=10)[10]
+        )
+        , na.value = "transparent"
+      ) +
+      ggplot2::scale_x_continuous(expand = c(0, 0)) +
+      ggplot2::scale_y_continuous(expand = c(0, 0)) +
+      ggplot2::labs(
+        x = ""
+        , y = ""
+        , fill = ""
+      ) +
+      ggplot2::theme_void() + 
+      ggplot2::theme(
+        legend.position = "left" # c(0.5,1)
+        , legend.margin = margin(0,0,0,0)
+        , legend.text = element_text(size = 6)
+        , legend.title = element_text(size = 6)
+        , legend.key = element_rect(fill = "white")
+        # , plot.title = ggtext::element_markdown(size = 10, hjust = 0.5)
+        , plot.title = element_text(size = 8, hjust = 0.5, face = "bold")
+        , plot.subtitle = element_text(size = 6, hjust = 0.5, face = "italic")
+      )
+  plt_temp <- class_temp+rgb_temp
+  return(plt_temp)
+}
+# add pile locations
+plt_list_kmeans <- sample(1:nrow(slash_piles_sf),10) %>% 
+  purrr::map(p_fn_temp)
 ```
 
+combine the plots for a few piles
+
+```{r, height = 10.5, width = 8}
+patchwork::wrap_plots(
+  plt_list_kmeans
+  , ncol = 2
+  , guides = "collect"
+)
+ggplot2::ggsave("../data/pile_tiles_kmeans.jpeg", height = 10.5, width = 8)
+```
+
+there is no discernible pattern between the kmeans classes and the slash piles because the lighting and conditions around the piles are not consistent. this result also highlights the challenges we'll likely face with pixel-based classification methods
+
+
+## Supervised classification
+
+Unsupervised image classification could be used to identify slash piles by grouping pixels with similar spectral characteristics. We'll call any method that implements classification at the pixel level like the unsupervised classification approach tested here "pixel-based image analysis" versus to OBIA. Unsupervised image classification uses algorithms like K-means to find natural clusters within spectral data and can use other inputs like elevation or spectral indices. This method operates without requiring pre-defined training data, making it useful when field data is limited. The output assigns each pixel to a class, which the user then interprets to potentially identify slash piles based on their distinct spectral signatures and elevated height. While effective for initial classification and pattern recognition, unsupervised methods can produce numerous classes that require manual interpretation and may be less accurate than supervised approaches without ground truth data.
+
+let's test it out and see what we get
+
+first, we'll convert our rasters to a data frame
