@@ -84,6 +84,7 @@ round_to_nearest_odd <- function(x) {
 ```{r}
 rast_rodmanetal2019_fn <- function(
     rast, windows_m = c(3,5,7,9,11,13,15), scale_to_1m = T
+    , rast_nm = "panchromatic"
 ) {
   rast <- rast[[1]]
   
@@ -137,7 +138,7 @@ rast_rodmanetal2019_fn <- function(
   
   # composite
   composite <- c(rast, local_sd, local_minima)
-  names(composite) <- c("panchromatic", "local_sd", "local_minima")
+  names(composite) <- c(rast_nm, "local_sd", "local_minima")
   
   # names
   names(local_minima) <- c("local_minima")
@@ -151,10 +152,14 @@ rast_rodmanetal2019_fn <- function(
 }
 ```
 
+### Raster Texture: Panchromatic
+
 implement our `rast_rodmanetal2019_fn` function
 ```{r}
-rodmanetal2019_rast <- rast_rodmanetal2019_fn(
-  rast = panchromatic_rast, scale_to_1m = F
+rodmanetal2019_panchromatic_rast <- rast_rodmanetal2019_fn(
+  rast = panchromatic_rast
+  , rast_nm = "panchromatic"
+  , scale_to_1m = F
 )
 ```
 
@@ -163,7 +168,7 @@ plot of "local minima" pixels that are darker than their surroundings
 ```{r}
 # plot
 terra::plot(
-  rodmanetal2019_rast$local_minima
+  rodmanetal2019_panchromatic_rast$local_minima
   , col = scales::pal_grey(0, 1)(8)
   , axes=F, legend = F
 )
@@ -173,7 +178,7 @@ plot of standard deviation pixel brightness which is a simple version of local t
 
 ```{r}
 terra::plot(
-  rodmanetal2019_rast$local_sd
+  rodmanetal2019_panchromatic_rast$local_sd
   , col = scales::pal_grey(0, 1)(100)
   , axes=F, legend = F
 )
@@ -183,12 +188,159 @@ plot of these combined panchromatic, local minima, and standard deviation images
 
 ```{r}
 terra::plotRGB(
-  rodmanetal2019_rast$composite
+  rodmanetal2019_panchromatic_rast$composite
   # , scale = c(255,7,520)
   , stretch = "hist", colNA = "transparent"
 )
 ```
 
+### Raster Texture: GRVI
+
+implement our `rast_rodmanetal2019_fn` function
+```{r}
+rodmanetal2019_grvi_rast <- rast_rodmanetal2019_fn(
+  rast = grvi_rast
+  , rast_nm = "grvi"
+  , scale_to_1m = F
+)
+```
+
+plot of these combined GRVI
+
+```{r}
+terra::plotRGB(
+  rodmanetal2019_grvi_rast$composite
+  # , scale = c(255,7,520)
+  , stretch = "hist", colNA = "transparent"
+)
+```
+
+### Plot textural rasters
+
+let's look at these textural rasters for some of the piles
+
+```{r}
+p_fn_temp <- function(
+    rn
+    , df = slash_piles_sf
+    , composite_rast = rodmanetal2019_grvi_rast$composite
+    , buff = 6.5, crs = terra::crs(ortho_rast)
+    , my_title = ""
+) {
+  # scale the buffer based on the largest
+    sc_temp <- buff/max(df$diameter, na.rm = T)
+    d_temp <- df %>%
+      dplyr::arrange(tolower(comment), desc(diameter)) %>% 
+      dplyr::slice(rn) %>% 
+      sf::st_zm() 
+    d_temp <- d_temp  %>% 
+      sf::st_buffer(
+        dplyr::case_when(
+          is.null(d_temp$diameter) | is.na(d_temp$diameter) ~ buff
+          , d_temp$diameter <= 0 ~ buff
+          , T ~ sc_temp*d_temp$diameter
+        )
+        , endCapStyle = "ROUND"
+      ) %>% 
+      sf::st_transform(crs)
+    
+    # plt classifier
+    # convert to stars
+    comp_st <- composite_rast %>%  
+      terra::subset(subset = c(1,2,3)) %>%
+      terra::crop(
+        d_temp %>% sf::st_buffer(20) %>% terra::vect()
+      ) %>% 
+      # terra::aggregate(fact = 2, fun = "mean", na.rm = T) %>% 
+      stars::st_as_stars()
+    
+    # convert to rgb
+    comp_rgb <- stars::st_rgb(
+      comp_st[,,,1:3]
+      , dimension = 3
+      , use_alpha = FALSE
+      # , stretch = "histogram"
+      , probs = c(0.002, 0.998)
+      , stretch = "percent"
+    )
+    # ggplot
+    comp_temp <- ggplot2::ggplot() +
+      stars::geom_stars(data = comp_rgb[]) +
+      ggplot2::scale_fill_identity(na.value = "transparent") + # !!! don't take this out or RGB plot will kill your computer
+      ggplot2::geom_sf(data = d_temp, fill = NA, color = "white", lwd = 0.3) +
+      ggplot2::scale_x_continuous(expand = c(0, 0)) +
+      ggplot2::scale_y_continuous(expand = c(0, 0)) +
+      ggplot2::labs(
+        x = ""
+        , y = ""
+        , subtitle = my_title
+      ) +
+      ggplot2::theme_void() +
+      ggplot2::theme(
+        legend.position = "none" # c(0.5,1)
+        , legend.direction = "horizontal"
+        , legend.margin = margin(0,0,0,0)
+        , legend.text = element_text(size = 8)
+        , legend.title = element_text(size = 8)
+        , legend.key = element_rect(fill = "white")
+        # , plot.title = ggtext::element_markdown(size = 10, hjust = 0.5)
+        , plot.title = element_text(size = 8, hjust = 0.5, face = "bold")
+        , plot.subtitle = element_text(size = 6, hjust = 0.5, face = "italic")
+      )
+    
+  plt_temp <- comp_temp
+  return(list("plt"=plt_temp,"d"=d_temp))
+}
+# combine 3
+plt_combine_temp <- function(
+    rn
+    , df = slash_piles_sf
+    , composite_rast1 = rodmanetal2019_panchromatic_rast$composite
+    , title1 = "panchromatic composite"
+    , composite_rast2 = rodmanetal2019_grvi_rast$composite
+    , title2 = "GRVI composite"
+    , buff = 6.5, crs = terra::crs(ortho_rast)
+) {
+  # composite 1
+  ans1 <- p_fn_temp(
+    rn = rn
+    , df = df
+    , composite_rast = composite_rast1
+    , my_title = title1
+    , buff = buff, crs = crs
+  )
+  # composite 2
+  ans2 <- p_fn_temp(
+    rn = rn
+    , df = df
+    , composite_rast = composite_rast2
+    , my_title = title2
+    , buff = buff, crs = crs
+  )
+  # plt rgb
+    rgb_temp <-
+      ortho_plt_fn(ans1$d) + 
+      ggplot2::geom_sf(data = ans1$d, fill = NA, color = "white", lwd = 0.3)
+  # combine
+    r <- ans1$plt + ans2$plt + rgb_temp
+    return(r)
+}
+
+# add pile locations
+plt_list_grvi_comp <- sample(1:nrow(slash_piles_sf),10) %>% 
+  purrr::map(plt_combine_temp)
+# plt_list_grvi_comp[[2]]
+```
+
+combine the plots for a few piles
+
+```{r, height = 10.5, width = 5}
+patchwork::wrap_plots(
+  plt_list_grvi_comp
+  , ncol = 1
+)
+ggplot2::ggsave("../data/pile_tiles_texture.jpeg", height = 10.5, width = 5)
+```
 
 ## Unsupervised classification
 
@@ -199,12 +351,19 @@ let's test it out and see what we get
 first, we'll convert our rasters to a data frame
 
 ```{r}
+#rename composites
+names(rodmanetal2019_panchromatic_rast$composite) <- c(
+  "panchromatic", "panchromatic_local_sd", "panchromatic_local_minima"
+)
+names(rodmanetal2019_grvi_rast$composite) <- c(
+  "grvi", "grvi_local_sd", "grvi_local_minima"
+)
 # combine rasters as data frame
 pred_df <- terra::as.data.frame(
     c(
       terra::subset(ortho_rast, c("red","green","blue"))
-      , rodmanetal2019_rast$composite
-      , grvi_rast
+      , rodmanetal2019_panchromatic_rast$composite
+      , rodmanetal2019_grvi_rast$composite
     )
     , xy = T
     , cell = T
@@ -226,14 +385,36 @@ pred_df <- terra::as.data.frame(
 pred_df %>% dplyr::slice_sample(n=100) %>% dplyr::glimpse()
 ```
 
+check out correlations between covariates
+
+```{r}
+# corrplot::corrplot.mixed(
+corrplot::corrplot(
+  pred_df %>% dplyr::select(-c(cell,x,y)) %>% stats::cor()
+  , method = "ellipse"
+  , order = "original" # "alphabet"
+  , type = "lower"
+  , diag = FALSE
+)
+```
+
+```{r, include = F, eval = F}
+pred_df %>% 
+  dplyr::slice_sample(prop = 0.2) +
+  ggplot(aes(x = grvi, y = panchromatic_local_minima)) +
+  geom_point() + 
+  geom_smooth(se=F, method = "lm")
+```
+
+
 perform kmeans clustering
 
 ```{r}
 set.seed(111)
-# Create 10 clusters, allow 500 iterations, start with 5 random sets using "Lloyd"
+# Create 6 clusters, allow 500 iterations, start with 5 random sets using "Lloyd"
 kmncluster <- stats::kmeans(
   pred_df %>% dplyr::select(-c(cell,x,y))
-  , centers=10
+  , centers=6
   , iter.max = 500
   , nstart = 5
   , algorithm="Lloyd"
@@ -253,7 +434,7 @@ kmeans_cluster_rast[pred_df$cell] <- kmncluster$cluster
 kmeans_cluster_rast
 ```
 
-there should be at most 10 clusters
+there should be at most 6 clusters
 
 ```{r}
 terra::freq(kmeans_cluster_rast)
@@ -264,7 +445,7 @@ plot the kmeans unsupervised classfication result
 ```{r}
 terra::plot(
   kmeans_cluster_rast
-  , col = viridis::turbo(n=10)
+  , col = viridis::turbo(n=6)
   , axes=F, legend = F
 )
 ```
@@ -318,16 +499,16 @@ p_fn_temp <- function(
       ggplot2::geom_sf(data = d_temp, fill = NA, color = "white", lwd = 1) +
       ggplot2::scale_fill_manual(
         values = c(
-          "1" = viridis::turbo(n=10)[1]
-          , "2" = viridis::turbo(n=10)[2]
-          , "3" = viridis::turbo(n=10)[3]
-          , "4" = viridis::turbo(n=10)[4]
-          , "5" = viridis::turbo(n=10)[5]
-          , "6" = viridis::turbo(n=10)[6]
-          , "7" = viridis::turbo(n=10)[7]
-          , "8" = viridis::turbo(n=10)[8]
-          , "9" = viridis::turbo(n=10)[9]
-          , "10" = viridis::turbo(n=10)[10]
+          "1" = viridis::turbo(n=6)[1]
+          , "2" = viridis::turbo(n=6)[2]
+          , "3" = viridis::turbo(n=6)[3]
+          , "4" = viridis::turbo(n=6)[4]
+          , "5" = viridis::turbo(n=6)[5]
+          , "6" = viridis::turbo(n=6)[6]
+          # , "7" = viridis::turbo(n=10)[7]
+          # , "8" = viridis::turbo(n=10)[8]
+          # , "9" = viridis::turbo(n=10)[9]
+          # , "10" = viridis::turbo(n=10)[10]
         )
         , na.value = "transparent"
       ) +
@@ -365,7 +546,7 @@ patchwork::wrap_plots(
   , ncol = 2
   , guides = "collect"
 )
-ggplot2::ggsave("../data/pile_tiles_kmeans.jpeg", height = 10.5, width = 8)
+ggplot2::ggsave("../data/pile_tiles_kmeans6.jpeg", height = 10.5, width = 8)
 ```
 
 there is no discernible pattern between the kmeans classes and the slash piles because the lighting and conditions around the piles are not consistent. this result also highlights the challenges we'll likely face with pixel-based classification methods

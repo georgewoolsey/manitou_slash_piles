@@ -1,0 +1,34 @@
+# Point Cloud Classification
+
+We'll use the point cloud data alone (to begin with) to attempt to classify slash piles without additional spectral information.
+
+We'll use the `cloud2trees` package to perform all preprocessing of point cloud data which includes:
+
+* ground classification and noise removal
+* raster data (DTM and CHM) generation
+* point cloud height normalization
+
+All of this can be accomplished using the `cloud2raster()` function. After generating these products from the raw point cloud we'll perform object segmentation to attempt to detect round, conical objects like slash piles from: 1) the normalized point cloud directly; 2) the CHM which we'll generate by setting the minimum height to zero to effectively create a digital surface model (DSM).
+
+To attempt to detect slash piles directly from the point cloud we can use a clustering algorithm such as DBSCAN (Density-Based Spatial Clustering of Applications with Noise) which identifies clusters based on point density, making it effective for detecting clusters of arbitrary shapes and sizes. It does not require the number of clusters to be specified beforehand. Insert something from TLS paper that used DBSCAN in semi-automated way....xxxxx. After segmenting the point cloud using DBSCAN, random forest can be used as a classifier (i.e. classification step) to distinguish slash piles from other objects based on their extracted geometric features. The general workflow is:
+
+1) for each point in the normalized non-ground point cloud, compute a suite of relevant geometric features within a defined local neighborhood radius using `lidR::point_metrics()`
+2) calculate features derived from PCA, such as linearity, planarity, sphericity, and surface variation. Also, compute curvature (mean, Gaussian) and roughness
+3) perform object segmentation/clustering to group points belonging to individual objects using DBSCAN which can identify dense clusters without requiring a predefined number of objects
+4) classify the segmented objects (clusters) as "slash pile" or "non-slash pile" based on their extracted features (e.g., sphericity, roughness, height, volume) with a random forest classifier using a manually annotated subset of segmented objects
+5) merge small, adjacent segments that likely belong to a single slash pile based on proximity and connectivity
+6) perform a confusion matrix-based evaluation on the results
+
+To attempt to identify slash piles from the CHM/DSM, we can use watershed segmentation (potentially without "seed" points) in a bottom-up approach. Insert something from paper about bottom-up approach that uses a CHM "slice" near the ground...xxxxx. For slash piles, which are often irregular and may not have a distinct "treetop" equivalent, CHM-based methods might be less directly applicable unless the piles present a very clear, isolated conical or rounded form. Could use expected morphology of the slash piles (e.g. maximum height) based on prior research.
+
+## Process Raw Point Cloud
+
+We'll use `cloud2trees::cloud2raster()` to process the raw point cloud data
+
+```{r}
+cloud2trees::cloud2raster(
+  output_dir = "../data"
+  , input_las_dir = 
+)
+```
+

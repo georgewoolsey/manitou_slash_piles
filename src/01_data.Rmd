@@ -15,6 +15,7 @@ library(latex2exp)
 library(mapview) # interactive html maps
 library(kableExtra) # tables
 library(patchwork) # combine plots
+library(corrplot) # correlation plots
 
 # spatial analysis
 library(terra) # raster
@@ -70,23 +71,25 @@ Let's check out the point cloud data we got using UAS-SfM methods
 
 ```{r}
 # directory with the downloaded .las|.laz files
-f <- "D:\\PFDP_Data\\p4pro_images\\P4Pro_06_17_2021_half_half_optimal\\2_densification\\point_cloud"
+f_temp <- 
+  "D:\\PFDP_Data\\p4pro_images\\P4Pro_06_17_2021_half_half_optimal\\2_densification\\point_cloud"
+  # system.file(package = "lidR", "extdata", "Megaplot.laz")
 # is there data?
-list.files(f, pattern = ".*\\.(laz|las)$") %>% length()
+list.files(f_temp, pattern = ".*\\.(laz|las)$") %>% length()
 # what files are in here?
-list.files(f, pattern = ".*\\.(laz|las)$")[1]
+list.files(f_temp, pattern = ".*\\.(laz|las)$")[1]
 ```
 
 what information does `lidR` read from the catalog?
 
 ```{r}
-ctg_temp <- lidR::readLAScatalog(f)
+las_ctg <- lidR::readLAScatalog(f_temp)
 # set the processing options
-lidR::opt_progress(ctg_temp) <- F
-lidR::opt_filter(ctg_temp) <- "-drop_duplicates"
-lidR::opt_select(ctg_temp) <- "xyziRGB"
+lidR::opt_progress(las_ctg) <- F
+lidR::opt_filter(las_ctg) <- "-drop_duplicates"
+lidR::opt_select(las_ctg) <- "xyziRGB"
 # huh?
-ctg_temp
+las_ctg
 ```
 
 that's a lot of points...can an ordinary laptop handle it? we'll find out.
@@ -94,7 +97,7 @@ that's a lot of points...can an ordinary laptop handle it? we'll find out.
 We'll plot our point cloud data tiles real quick to orient ourselves
 
 ```{r}
-ctg_temp %>% 
+las_ctg %>% 
   purrr::pluck("data") %>% 
   mapview::mapview(popup = F, layer.name = "point cloud tile")
 ```
@@ -103,7 +106,7 @@ ctg_temp %>%
 
 ```{r}
 las_temp <- lidR::clip_roi(
-  ctg_temp
+  las_ctg
   # biggest mechanical
   , slash_piles_sf %>%
     dplyr::filter(tolower(comment)=="mechanical pile") %>% 
@@ -111,7 +114,7 @@ las_temp <- lidR::clip_roi(
     dplyr::slice(1) %>% 
     sf::st_zm() %>% 
     sf::st_buffer(10, endCapStyle = "SQUARE") %>% 
-    sf::st_transform(lidR::st_crs(ctg_temp))
+    sf::st_transform(lidR::st_crs(las_ctg))
 )
 ```
 
@@ -188,7 +191,7 @@ Orthomosaic `tif` files from the UAS flight imagery that were created in [Agisof
     , pattern = "*\\.(tif|tiff)$", full.names = T)[] %>% 
     purrr::map(function(x){terra::rast(x)})
   
-  # ortho_list_temp[[1]] %>%
+  ortho_list_temp[[1]] %>% terra::res()
   #   terra::aggregate(20) %>%
   #   terra::plotRGB(r = 1, g = 2, b = 3, stretch = "hist", colNA = "transparent")
   
@@ -196,15 +199,15 @@ Orthomosaic `tif` files from the UAS flight imagery that were created in [Agisof
     # terra::res(ortho_list_temp[[1]])
     
     ## function
-    change_res_fn <- function(r, my_res=1){
+    change_res_fn <- function(r, my_res=1, m = "bilinear"){
       r2 <- r
       terra::res(r2) <- my_res
-      r2 <- terra::resample(r, r2)
+      r2 <- terra::resample(r, r2, method = m)
       return(r2)
     }
     ## apply the function
     ortho_list_temp <- 1:length(ortho_list_temp) %>% 
-      purrr::map(function(x){change_res_fn(ortho_list_temp[[x]], my_res=0.25)})
+      purrr::map(function(x){change_res_fn(ortho_list_temp[[x]], my_res=0.15)})
     
     # terra::res(ortho_list_temp[[1]])
     
@@ -438,5 +441,5 @@ we have point locations of piles. object-based image analysis will require polyg
 
 notice that defining the pile "objects" with this point data is going to be challenging given the point locations appear to not have been measured at the center of each pile. if they had, we could use the point location and then buffer by the pile diameter to get the pile extent.
 
-another challenge will be training a model with the different lighting conditions in the imagery (e.g. piles in shadows or under tree crowns)
+another challenge will be training a spectral-based model with the different lighting conditions in the imagery (e.g. piles in shadows or under tree crowns). this different lighting may have also influenced the point cloud generation
 
