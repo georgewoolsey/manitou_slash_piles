@@ -222,26 +222,15 @@ let's look at these textural rasters for some of the piles
 ```{r}
 p_fn_temp <- function(
     rn
-    , df = slash_piles_sf
+    , df = slash_piles_polys
     , composite_rast = rodmanetal2019_grvi_rast$composite
-    , buff = 6.5, crs = terra::crs(ortho_rast)
+    , crs = terra::crs(ortho_rast)
     , my_title = ""
 ) {
   # scale the buffer based on the largest
-    sc_temp <- buff/max(df$diameter, na.rm = T)
     d_temp <- df %>%
       dplyr::arrange(tolower(comment), desc(diameter)) %>% 
       dplyr::slice(rn) %>% 
-      sf::st_zm() 
-    d_temp <- d_temp  %>% 
-      sf::st_buffer(
-        dplyr::case_when(
-          is.null(d_temp$diameter) | is.na(d_temp$diameter) ~ buff
-          , d_temp$diameter <= 0 ~ buff
-          , T ~ sc_temp*d_temp$diameter
-        )
-        , endCapStyle = "ROUND"
-      ) %>% 
       sf::st_transform(crs)
     
     # plt classifier
@@ -294,12 +283,12 @@ p_fn_temp <- function(
 # combine 3
 plt_combine_temp <- function(
     rn
-    , df = slash_piles_sf
+    , df = slash_piles_polys %>% dplyr::filter(!is.na(comment))
     , composite_rast1 = rodmanetal2019_panchromatic_rast$composite
     , title1 = "panchromatic composite"
     , composite_rast2 = rodmanetal2019_grvi_rast$composite
     , title2 = "GRVI composite"
-    , buff = 6.5, crs = terra::crs(ortho_rast)
+    , crs = terra::crs(ortho_rast)
 ) {
   # composite 1
   ans1 <- p_fn_temp(
@@ -307,7 +296,7 @@ plt_combine_temp <- function(
     , df = df
     , composite_rast = composite_rast1
     , my_title = title1
-    , buff = buff, crs = crs
+    , crs = crs
   )
   # composite 2
   ans2 <- p_fn_temp(
@@ -315,7 +304,7 @@ plt_combine_temp <- function(
     , df = df
     , composite_rast = composite_rast2
     , my_title = title2
-    , buff = buff, crs = crs
+    , crs = crs
   )
   # plt rgb
     rgb_temp <-
@@ -327,7 +316,7 @@ plt_combine_temp <- function(
 }
 
 # add pile locations
-plt_list_grvi_comp <- sample(1:nrow(slash_piles_sf),10) %>% 
+plt_list_grvi_comp <- sample(1:nrow(slash_piles_polys %>% dplyr::filter(!is.na(comment))),10) %>% 
   purrr::map(plt_combine_temp)
 # plt_list_grvi_comp[[2]]
 ```
@@ -358,13 +347,61 @@ names(rodmanetal2019_panchromatic_rast$composite) <- c(
 names(rodmanetal2019_grvi_rast$composite) <- c(
   "grvi", "grvi_local_sd", "grvi_local_minima"
 )
+# raster stack
+pred_rast <- c(
+  terra::subset(ortho_rast, c("red","green","blue"))
+  , rodmanetal2019_panchromatic_rast$composite
+  , rodmanetal2019_grvi_rast$composite
+)
+```
+
+check out correlations between covariates
+
+```{r}
+# investigate correlation among environmental covariates
+pred_rast %>% 
+  terra::pairs(
+    maxcells = min(10000, terra::ncell(pred_rast)*.01)
+  )
+```
+
+```{r, include = F, eval = F}
+# corrplot::corrplot.mixed(
+corrplot::corrplot(
+  pred_df %>% 
+    dplyr::select(-c(cell,x,y)) %>% 
+    dplyr::filter(dplyr::if_all(dplyr::everything(), ~ .x != -99)) %>% 
+    stats::cor()
+  , method = "ellipse"
+  , order = "original" # "alphabet"
+  , type = "lower"
+  , diag = FALSE
+)
+
+pred_df %>% 
+  # dplyr::filter(dplyr::if_all(dplyr::everything(), ~ .x != -99)) %>% 
+  nrow()
+
+pred_df %>% 
+  dplyr::slice_sample(prop = 0.01) %>% 
+  dplyr::filter(dplyr::if_all(dplyr::everything(), ~ .x != -99)) %>% 
+  ggplot(aes(x = green, y = grvi)) +
+  geom_point() + 
+  geom_smooth(se=F, method = "lm")
+```
+
+the panchromatic band itself doesn't add much new information, let's remove it and generate a data frame for training kmeans clustering
+
+```{r}
+# remove correlated layers
+pred_rast <- terra::subset(
+  pred_rast
+  , subset = c("panchromatic")
+  , negate = T
+)
 # combine rasters as data frame
 pred_df <- terra::as.data.frame(
-    c(
-      terra::subset(ortho_rast, c("red","green","blue"))
-      , rodmanetal2019_panchromatic_rast$composite
-      , rodmanetal2019_grvi_rast$composite
-    )
+    pred_rast
     , xy = T
     , cell = T
   ) %>% 
@@ -384,28 +421,6 @@ pred_df <- terra::as.data.frame(
 # what is this data?
 pred_df %>% dplyr::slice_sample(n=100) %>% dplyr::glimpse()
 ```
-
-check out correlations between covariates
-
-```{r}
-# corrplot::corrplot.mixed(
-corrplot::corrplot(
-  pred_df %>% dplyr::select(-c(cell,x,y)) %>% stats::cor()
-  , method = "ellipse"
-  , order = "original" # "alphabet"
-  , type = "lower"
-  , diag = FALSE
-)
-```
-
-```{r, include = F, eval = F}
-pred_df %>% 
-  dplyr::slice_sample(prop = 0.2) +
-  ggplot(aes(x = grvi, y = panchromatic_local_minima)) +
-  geom_point() + 
-  geom_smooth(se=F, method = "lm")
-```
-
 
 perform kmeans clustering
 
@@ -460,25 +475,14 @@ gc()
 ```{r}
 p_fn_temp <- function(
     rn
-    , df = slash_piles_sf
+    , df = slash_piles_polys %>% dplyr::filter(!is.na(comment))
     , cluster_rast = kmeans_cluster_rast
-    , buff = 6.5, crs = terra::crs(ortho_rast)
+    , crs = terra::crs(ortho_rast)
 ) {
   # scale the buffer based on the largest
-    sc_temp <- buff/max(df$diameter, na.rm = T)
     d_temp <- df %>%
       dplyr::arrange(tolower(comment), desc(diameter)) %>% 
       dplyr::slice(rn) %>% 
-      sf::st_zm() 
-    d_temp <- d_temp  %>% 
-      sf::st_buffer(
-        dplyr::case_when(
-          is.null(d_temp$diameter) | is.na(d_temp$diameter) ~ buff
-          , d_temp$diameter <= 0 ~ buff
-          , T ~ sc_temp*d_temp$diameter
-        )
-        , endCapStyle = "ROUND"
-      ) %>% 
       sf::st_transform(crs)
     # plt
     rgb_temp <-
@@ -534,7 +538,7 @@ p_fn_temp <- function(
   return(plt_temp)
 }
 # add pile locations
-plt_list_kmeans <- sample(1:nrow(slash_piles_sf),10) %>% 
+plt_list_kmeans <- sample(1:nrow(slash_piles_polys %>% dplyr::filter(!is.na(comment))),10) %>% 
   purrr::map(p_fn_temp)
 ```
 
@@ -554,8 +558,55 @@ there is no discernible pattern between the kmeans classes and the slash piles b
 
 ## Supervised classification
 
-Unsupervised image classification could be used to identify slash piles by grouping pixels with similar spectral characteristics. We'll call any method that implements classification at the pixel level like the unsupervised classification approach tested here "pixel-based image analysis" versus to OBIA. Unsupervised image classification uses algorithms like K-means to find natural clusters within spectral data and can use other inputs like elevation or spectral indices. This method operates without requiring pre-defined training data, making it useful when field data is limited. The output assigns each pixel to a class, which the user then interprets to potentially identify slash piles based on their distinct spectral signatures and elevated height. While effective for initial classification and pattern recognition, unsupervised methods can produce numerous classes that require manual interpretation and may be less accurate than supervised approaches without ground truth data.
+first, we'll generate a set of sample points to extract raster values from 
 
-let's test it out and see what we get
+```{r}
+grvi_rast %>% 
+  terra::mask(
+    slash_piles_polys %>% 
+      dplyr::filter(!is.na(comment)) %>% 
+      sf::st_transform(terra::crs(grvi_rast)) %>% 
+      terra::vect()
+    , inverse = T
+  ) %>%
+  terra::plot()
+terra::points(
+  grvi_rast %>% 
+  terra::mask(
+    slash_piles_polys %>% 
+      dplyr::filter(!is.na(comment)) %>% 
+      sf::st_transform(terra::crs(grvi_rast)) %>% 
+      terra::vect()
+    , inverse = T
+  ) %>%
+    terra::spatSample(size = 1000)
+)
+grvi_rast %>% 
+  terra::mask(
+    slash_piles_polys %>% 
+      dplyr::filter(!is.na(comment)) %>% 
+      sf::st_transform(terra::crs(grvi_rast)) %>% 
+      terra::vect()
+    , inverse = T
+  ) %>%
+    terra::spatSample(size = 10, na.rm = T)
+# pile samples
+  slash_piles_polys %>% 
+    dplyr::filter(!is.na(comment)) %>% 
+    sf::st_transform(terra::crs(grvi_rast)) %>% 
+    terra::vect() %>% 
+    terra::spatSample(size = 100) %>% 
+    sf::st_as_sf() %>% 
+    dplyr::mutate(
+      is_pile = 1
+    ) %>% 
+    dplyr::select(is_pile)
+```
 
-first, we'll convert our rasters to a data frame
+
+extract the raster cell values from each layer in our RGB-based raster data, these values will be the predictor variables
+
+```{r}
+
+```
+

@@ -49,20 +49,31 @@ gc()
 ## Slash Pile Vector Data
 
 ```{r}
-slash_piles_sf <- sf::st_read("D:\\PFDP_Data\\PFDP_SlashPiles\\SlashPiles.shp") %>% 
+# points recorded in field
+slash_piles_points <- sf::st_read("D:\\PFDP_Data\\PFDP_SlashPiles\\SlashPiles.shp") %>% 
   dplyr::rename_with(tolower)
+# polygons annotated using RGB and field-collected points
+slash_piles_polys <- sf::st_read("D:\\PFDP_Data\\PFDP_SlashPiles\\SlashPiles_Polygons.shp") %>% 
+  dplyr::rename_with(tolower) %>% 
+  dplyr::mutate(pile_id = as.factor(pile_idx)) %>% 
+  dplyr::select(-pile_idx) %>% 
+  sf::st_make_valid() %>% 
+  dplyr::filter(sf::st_is_valid(.)) %>% 
+  # add point data to polygon
+  sf::st_join(slash_piles_points %>% sf::st_zm())
 ```
 
 what? 
 
 ```{r}
-slash_piles_sf %>% dplyr::glimpse()
+slash_piles_polys %>% dplyr::glimpse()
 ```
 
 where?
 
 ```{r}
-mapview::mapview(slash_piles_sf, zcol = "comment", layer.name = "slash piles")
+# mapview::mapview(slash_piles_points, zcol = "comment", layer.name = "slash piles")
+mapview::mapview(slash_piles_polys, zcol = "comment", layer.name = "slash piles")
 ```
 
 ## Point Cloud Data
@@ -108,7 +119,7 @@ las_ctg %>%
 las_temp <- lidR::clip_roi(
   las_ctg
   # biggest mechanical
-  , slash_piles_sf %>%
+  , slash_piles_points %>%
     dplyr::filter(tolower(comment)=="mechanical pile") %>% 
     dplyr::arrange(desc(diameter)) %>% 
     dplyr::slice(1) %>% 
@@ -254,16 +265,16 @@ ortho_plt_fn = function(stand = las_ctg_dta %>% sf::st_union() %>% sf::st_as_sf(
     , stretch = "percent"
   )
   # ggplot
-  plt_rgb <- ggplot() +
+  plt_rgb <- ggplot2::ggplot() +
     stars::geom_stars(data = ortho_rgb[]) +
-    scale_fill_identity(na.value = "transparent") + # !!! don't take this out or RGB plot will kill your computer
-    scale_x_continuous(expand = c(0, 0)) +
-    scale_y_continuous(expand = c(0, 0)) +
-    labs(
+    ggplot2::scale_fill_identity(na.value = "transparent") + # !!! don't take this out or RGB plot will kill your computer
+    ggplot2::scale_x_continuous(expand = c(0, 0)) +
+    ggplot2::scale_y_continuous(expand = c(0, 0)) +
+    ggplot2::labs(
       x = ""
       , y = ""
     ) +
-    theme_void()
+    ggplot2::theme_void()
   
   # return(plt_rgb)
   # combine all plot elements
@@ -274,16 +285,16 @@ ortho_plt_fn = function(stand = las_ctg_dta %>% sf::st_union() %>% sf::st_as_sf(
     #   , lwd = 1.5
     #   , color = "gray22"
     # ) +
-    theme(
+    ggplot2::theme(
       legend.position = "top" # c(0.5,1)
       , legend.direction = "horizontal"
-      , legend.margin = margin(0,0,0,0)
-      , legend.text = element_text(size = 8)
-      , legend.title = element_text(size = 8)
-      , legend.key = element_rect(fill = "white")
+      , legend.margin = ggplot2::margin(0,0,0,0)
+      , legend.text = ggplot2::element_text(size = 8)
+      , legend.title = ggplot2::element_text(size = 8)
+      , legend.key = ggplot2::element_rect(fill = "white")
       # , plot.title = ggtext::element_markdown(size = 10, hjust = 0.5)
-      , plot.title = element_text(size = 8, hjust = 0.5, face = "bold")
-      , plot.subtitle = element_text(size = 6, hjust = 0.5, face = "italic")
+      , plot.title = ggplot2::element_text(size = 8, hjust = 0.5, face = "bold")
+      , plot.subtitle = ggplot2::element_text(size = 6, hjust = 0.5, face = "italic")
     )
   return(plt_combine)
 }
@@ -292,7 +303,7 @@ ortho_plt_fn = function(stand = las_ctg_dta %>% sf::st_union() %>% sf::st_as_sf(
 plot an example slash pile RGB image
 
 ```{r}
-stand_temp = slash_piles_sf %>%
+stand_temp = slash_piles_points %>%
     dplyr::filter(tolower(comment)=="mechanical pile") %>% 
     dplyr::arrange(desc(diameter)) %>% 
     dplyr::slice(1) %>% 
@@ -322,7 +333,7 @@ The Green-Red Vegetation Index (GRVI) uses the reflectance of green and red band
 ```{r}
 grvi_rast <- spectral_index_fn(rast = ortho_rast, layer1 = 2, layer2 = 1)
 names(grvi_rast) <- c("grvi")
-terra::plot(grvi_rast)
+terra::plot(grvi_rast, col = harrypotter::hp(n=100, option = "Slytherin"))
 ```
 
 let's check the GRVI for a pile
@@ -369,7 +380,7 @@ let's look at the RGB imagery and pile locations
 ```{r}
 # get the base plot
 plt_rgb_ortho <- ortho_plt_fn(
-  slash_piles_sf %>% 
+  slash_piles_points %>% 
   sf::st_bbox() %>% 
   sf::st_as_sfc() %>% 
   sf::st_buffer(50) %>% 
@@ -378,7 +389,7 @@ plt_rgb_ortho <- ortho_plt_fn(
 # add pile locations
 plt_rgb_ortho +
   ggplot2::geom_sf(
-    data = slash_piles_sf %>% sf::st_transform(terra::crs(ortho_rast))
+    data = slash_piles_points %>% sf::st_transform(terra::crs(ortho_rast))
     , ggplot2::aes() # size = diameter
     , shape = 1
     , color = "firebrick"
@@ -388,25 +399,20 @@ plt_rgb_ortho +
 
 notice these are point measurements of plot locations and the points are not precisely in the center of the pile. notice also there are piles in the imagery that were not measured (e.g. upper-left corner)
 
+Update: we created image-annotated pile polygons using the RBG and field-collected pile location data
+
 let's make a panel of plots for each pile
 
 ```{r}
-p_fn_temp <- function(rn, df = slash_piles_sf, buff = 6.5, crs = terra::crs(ortho_rast)) {
+p_fn_temp <- function(
+    rn
+    , df = slash_piles_polys %>% dplyr::filter(!is.na(comment))
+    , crs = terra::crs(ortho_rast)
+) {
   # scale the buffer based on the largest
-  sc <- buff/max(df$diameter, na.rm = T)
   d <- df %>%
     dplyr::arrange(tolower(comment), desc(diameter)) %>% 
     dplyr::slice(rn) %>% 
-    sf::st_zm() 
-  d <- d  %>% 
-    sf::st_buffer(
-      dplyr::case_when(
-        is.null(d$diameter) | is.na(d$diameter) ~ buff
-        , d$diameter <= 0 ~ buff
-        , T ~ sc*d$diameter
-      )
-      , endCapStyle = "ROUND"
-    ) %>% 
     sf::st_transform(crs)
   # plt
   ortho_plt_fn(d) + 
@@ -422,7 +428,7 @@ p_fn_temp <- function(rn, df = slash_piles_sf, buff = 6.5, crs = terra::crs(orth
     )
 }
 # add pile locations
-plt_list_rgb <- 1:nrow(slash_piles_sf) %>% 
+plt_list_rgb <- 1:nrow(slash_piles_polys %>% dplyr::filter(!is.na(comment))) %>% 
   purrr::map(p_fn_temp)
 ```
 
@@ -431,15 +437,13 @@ plot tiles
 ```{r, height = 10.5, width = 8}
 patchwork::wrap_plots(
   sample(
-    plt_list_rgb, size = as.integer(nrow(slash_piles_sf)/3))
+    plt_list_rgb, size = as.integer(nrow(slash_piles_points)/3))
   , ncol = 5
 )
 ggsave("../data/pile_tiles_rgb.jpeg", height = 10.5, width = 8)
 ```
 
-we have point locations of piles. object-based image analysis will require polygon data so that we have sets of pixels (i.e. "objects") to work with for training our model.
-
-notice that defining the pile "objects" with this point data is going to be challenging given the point locations appear to not have been measured at the center of each pile. if they had, we could use the point location and then buffer by the pile diameter to get the pile extent.
+object-based image analysis will require polygon data so that we have sets of pixels (i.e. "objects") to work with for training our model (nice, we'll use the image-annotated pile data)
 
 another challenge will be training a spectral-based model with the different lighting conditions in the imagery (e.g. piles in shadows or under tree crowns). this different lighting may have also influenced the point cloud generation
 

@@ -25,10 +25,108 @@ To attempt to identify slash piles from the CHM/DSM, we can use watershed segmen
 
 We'll use `cloud2trees::cloud2raster()` to process the raw point cloud data
 
-```{r}
-cloud2trees::cloud2raster(
-  output_dir = "../data"
-  , input_las_dir = 
+```{r, include=FALSE,eval=FALSE}
+# something bad is happening with this point cloud
+errors_temp <- sf::st_read("D:\\PFDP_Data\\las_errors/error_areas.shp") %>% 
+  dplyr::rename_with(tolower)
+mapview::mapview(errors_temp)
+las_temp <- lidR::clip_roi(
+  las_ctg
+  , errors_temp %>% 
+    dplyr::slice(2) %>% 
+    sf::st_transform(lidR::st_crs(las_ctg))
 )
+lidR::decimate_points(las_temp, algorithm = lidR::random(10)) %>% lidR::plot()
+
+lidR::writeLAS(las_temp, "D:\\PFDP_Data\\las_errors/las_error2.las", index = T)
+
+xxx_temp <- cloud2trees::cloud2raster(
+  output_dir = tempdir()
+  , input_las_dir = "D:\\PFDP_Data\\las_errors/las_error2.las"
+  , dtm_res_m = 0.5
+  , chm_res_m = 0.2
+)
+xxx_temp$dtm_rast %>% 
+  # terra::aggregate(2,na.rm = T) %>% 
+  terra::plot()
+xxx_temp$chm_rast %>% 
+  # terra::aggregate(2,na.rm = T) %>% 
+  terra::plot()
+
+### this is from cloud2raster for combining dtm tiles
+###############
+# DTM
+###############
+  # output name
+  dtm_file_name <- paste0("../data/error_point_cloud_processing_delivery", "/dtm_", 0.1, "m.tif")
+  # read
+  rast_list_temp <- list.files("../data/error_point_cloud_processing_temp/03_dtm", pattern = ".*\\.(tif|tiff)$", full.names = T) %>%
+    purrr::map(function(x){terra::rast(x)})
+  rast_list_temp[[12]] %>% 
+    # terra::aggregate(2,na.rm = T) %>% 
+    terra::plot()
+  # mosaic
+  dtm_rast <- terra::sprc(rast_list_temp) %>% terra::mosaic(fun = "mean")
+  dtm_rast %>% 
+    terra::aggregate(2,na.rm = T) %>% 
+    terra::res() %>% 
+    terra::plot()
+  # set crs
+    terra::crs(dtm_rast) <- chunk_las_catalog_ans$process_data$proj_crs[1]
+  # write to delivery directory
+    terra::writeRaster(
+      dtm_rast
+      , filename = dtm_file_name
+      , overwrite = T
+    )
+##########################################
+    # lidR point segmentation
+las <- lidR::segment_shapes(
+  las
+  , algorithm = lidR::shp_hplane(k = 25)
+  , attribute = "planar"
+)
+# Realtime_detection_of_planar_regions_in_unorganized_point_clouds
+lidR::point_eigenvalues()
 ```
 
+
+```{r}
+if(!dir.exists("../data/point_cloud_processing_delivery")){
+  cloud2raster_ans <- cloud2trees::cloud2raster(
+    output_dir = "../data"
+    , input_las_dir = "D:\\PFDP_Data\\p4pro_images\\P4Pro_06_17_2021_half_half_optimal\\2_densification\\point_cloud"
+    , max_ctg_pts = 9e+07
+    , accuracy_level = 3
+    , keep_intrmdt = T
+    , dtm_res_m = 0.5
+    , chm_res_m = 0.2
+    , min_height = 0 # effectively generates a DSM based on non-ground points
+  )
+}else{
+  dtm_temp <- terra::rast("../data/point_cloud_processing_delivery/dtm_0.5m.tif")
+  chm_temp <- terra::rast("../data/point_cloud_processing_delivery/chm_0.2m.tif")
+  cloud2raster_ans <- list(
+    "dtm_rast" = dtm_temp
+    , "chm_rast" = chm_temp
+  )
+}
+```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE, include=FALSE}
+remove(list = ls()[grep("_temp",ls())])
+gc()
+```
+
+let's check out the DTM
+
+```{r}
+cloud2raster_ans$chm_rast %>% 
+  # terra::clamp(lower = 2) %>% 
+  # terra::summary()
+  terra::aggregate(fact = 2) %>%  #, fun = "median", cores = lasR::half_cores(), na.rm = T) %>% 
+  terra::plot(col = viridis::viridis(100), add = T)
+
+```
+
+and CHM
