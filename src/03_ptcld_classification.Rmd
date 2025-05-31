@@ -91,7 +91,7 @@ lidR::point_eigenvalues()
 ```
 
 
-```{r}
+```{r,eval=FALSE}
 if(!dir.exists("../data/point_cloud_processing_delivery")){
   cloud2raster_ans <- cloud2trees::cloud2raster(
     output_dir = "../data"
@@ -120,7 +120,7 @@ gc()
 
 let's check out the DTM
 
-```{r}
+```{r, include=FALSE,eval=FALSE}
 cloud2raster_ans$chm_rast %>% 
   # terra::clamp(lower = 2) %>% 
   # terra::summary()

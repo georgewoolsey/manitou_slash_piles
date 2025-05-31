@@ -1,0 +1,1144 @@
+<!DOCTYPE html>
+<html lang="en-US" xml:lang="en-US">
+<head>
+
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <title>Section 3 RGB Classification | Aerial Imagery and Point Cloud Data for Slash Pile Quantification</title>
+  <meta name="description" content="Using the bookdown package to write a book of data exploration. The output format for this example is bookdown::gitbook." />
+  <meta name="generator" content="bookdown 0.34 and GitBook 2.6.7" />
+
+  <meta property="og:title" content="Section 3 RGB Classification | Aerial Imagery and Point Cloud Data for Slash Pile Quantification" />
+  <meta property="og:type" content="book" />
+  
+  <meta property="og:description" content="Using the bookdown package to write a book of data exploration. The output format for this example is bookdown::gitbook." />
+  
+
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="Section 3 RGB Classification | Aerial Imagery and Point Cloud Data for Slash Pile Quantification" />
+  
+  <meta name="twitter:description" content="Using the bookdown package to write a book of data exploration. The output format for this example is bookdown::gitbook." />
+  
+
+<meta name="author" content="George Woolsey" />
+
+
+
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+  
+  
+<link rel="prev" href="data-processing.html"/>
+<link rel="next" href="point-cloud-classification.html"/>
+<script src="libs/jquery-3.6.0/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fuse.js@6.4.6/dist/fuse.min.js"></script>
+<link href="libs/gitbook-2.6.7/css/style.css" rel="stylesheet" />
+<link href="libs/gitbook-2.6.7/css/plugin-table.css" rel="stylesheet" />
+<link href="libs/gitbook-2.6.7/css/plugin-bookdown.css" rel="stylesheet" />
+<link href="libs/gitbook-2.6.7/css/plugin-highlight.css" rel="stylesheet" />
+<link href="libs/gitbook-2.6.7/css/plugin-search.css" rel="stylesheet" />
+<link href="libs/gitbook-2.6.7/css/plugin-fontsettings.css" rel="stylesheet" />
+<link href="libs/gitbook-2.6.7/css/plugin-clipboard.css" rel="stylesheet" />
+
+
+
+
+
+
+
+
+<link href="libs/anchor-sections-1.1.0/anchor-sections.css" rel="stylesheet" />
+<link href="libs/anchor-sections-1.1.0/anchor-sections-hash.css" rel="stylesheet" />
+<script src="libs/anchor-sections-1.1.0/anchor-sections.js"></script>
+<link href="libs/htmltools-fill-0.5.8.1/fill.css" rel="stylesheet" />
+<script src="libs/htmlwidgets-1.6.4/htmlwidgets.js"></script>
+<link href="libs/leaflet-1.3.1/leaflet.css" rel="stylesheet" />
+<script src="libs/leaflet-1.3.1/leaflet.js"></script>
+<link href="libs/leafletfix-1.0.0/leafletfix.css" rel="stylesheet" />
+<script src="libs/proj4-2.6.2/proj4.min.js"></script>
+<script src="libs/Proj4Leaflet-1.0.1/proj4leaflet.js"></script>
+<link href="libs/rstudio_leaflet-1.3.1/rstudio_leaflet.css" rel="stylesheet" />
+<script src="libs/leaflet-binding-2.2.2/leaflet.js"></script>
+<script src="libs/leaflet-providers-2.0.0/leaflet-providers_2.0.0.js"></script>
+<script src="libs/leaflet-providers-plugin-2.2.2/leaflet-providers-plugin.js"></script>
+<script src="libs/clipboard-0.0.1/setClipboardText.js"></script>
+<link href="libs/mapviewCSS-0.0.1/mapview-popup.css" rel="stylesheet" />
+<link href="libs/mapviewCSS-0.0.1/mapview.css" rel="stylesheet" />
+<script type="text/javascript">
+
+// toggle visibility of R source blocks in R Markdown output
+function toggle_R() {
+  var x = document.getElementsByClassName('r');
+  if (x.length == 0) return;
+  function toggle_vis(o) {
+    var d = o.style.display;
+    o.style.display = (d == 'block' || d == '') ? 'none':'block';
+  }
+
+  for (i = 0; i < x.length; i++) {
+    var y = x[i];
+    if (y.tagName.toLowerCase() === 'pre') toggle_vis(y);
+  }
+
+    var elem = document.getElementById("myButton1");
+    if (elem.value === "Hide Code") elem.value = "Show Code";
+    else elem.value = "Hide Code";
+}
+
+document.write('<input onclick="toggle_R();" type="button" value="Hide Code" id="myButton1" style="position: absolute; top: 10%; right: 2%; z-index: 200"></input>')
+
+</script>
+
+
+<style type="text/css">
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #7d9029; } /* Attribute */
+code span.bn { color: #40a070; } /* BaseN */
+code span.bu { color: #008000; } /* BuiltIn */
+code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4070a0; } /* Char */
+code span.cn { color: #880000; } /* Constant */
+code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+code span.dt { color: #902000; } /* DataType */
+code span.dv { color: #40a070; } /* DecVal */
+code span.er { color: #ff0000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #40a070; } /* Float */
+code span.fu { color: #06287e; } /* Function */
+code span.im { color: #008000; font-weight: bold; } /* Import */
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+code span.op { color: #666666; } /* Operator */
+code span.ot { color: #007020; } /* Other */
+code span.pp { color: #bc7a00; } /* Preprocessor */
+code span.sc { color: #4070a0; } /* SpecialChar */
+code span.ss { color: #bb6688; } /* SpecialString */
+code span.st { color: #4070a0; } /* String */
+code span.va { color: #19177c; } /* Variable */
+code span.vs { color: #4070a0; } /* VerbatimString */
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+</style>
+
+<style type="text/css">
+  
+  div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+</style>
+
+</head>
+
+<body>
+
+
+
+  <div class="book without-animation with-summary font-size-2 font-family-1" data-basepath=".">
+
+    <div class="book-summary">
+      <nav role="navigation">
+
+<ul class="summary">
+<li class="chapter" data-level="1" data-path="index.html"><a href="index.html"><i class="fa fa-check"></i><b>1</b> Introduction</a>
+<ul>
+<li class="chapter" data-level="1.1" data-path="index.html"><a href="index.html#objective"><i class="fa fa-check"></i><b>1.1</b> Objective</a></li>
+<li class="chapter" data-level="1.2" data-path="index.html"><a href="index.html#data_desc"><i class="fa fa-check"></i><b>1.2</b> Data</a></li>
+</ul></li>
+<li class="chapter" data-level="2" data-path="data-processing.html"><a href="data-processing.html"><i class="fa fa-check"></i><b>2</b> Data Processing</a>
+<ul>
+<li class="chapter" data-level="2.1" data-path="data-processing.html"><a href="data-processing.html#slash-pile-vector-data"><i class="fa fa-check"></i><b>2.1</b> Slash Pile Vector Data</a></li>
+<li class="chapter" data-level="2.2" data-path="data-processing.html"><a href="data-processing.html#load-rgb-orthomosaic-rasters"><i class="fa fa-check"></i><b>2.2</b> Load RGB orthomosaic rasters</a>
+<ul>
+<li class="chapter" data-level="2.2.1" data-path="data-processing.html"><a href="data-processing.html#example-ratio-based-index"><i class="fa fa-check"></i><b>2.2.1</b> Example ratio-based index</a></li>
+</ul></li>
+<li class="chapter" data-level="2.3" data-path="data-processing.html"><a href="data-processing.html#study-area-imagery"><i class="fa fa-check"></i><b>2.3</b> Study area imagery</a></li>
+<li class="chapter" data-level="2.4" data-path="data-processing.html"><a href="data-processing.html#point-cloud-data"><i class="fa fa-check"></i><b>2.4</b> Point Cloud Data</a></li>
+<li class="chapter" data-level="2.5" data-path="data-processing.html"><a href="data-processing.html#check-out-one-pile"><i class="fa fa-check"></i><b>2.5</b> Check out one pile</a></li>
+</ul></li>
+<li class="chapter" data-level="3" data-path="rgb-classification.html"><a href="rgb-classification.html"><i class="fa fa-check"></i><b>3</b> RGB Classification</a>
+<ul>
+<li class="chapter" data-level="3.1" data-path="rgb-classification.html"><a href="rgb-classification.html#textural-covariates"><i class="fa fa-check"></i><b>3.1</b> Textural covariates</a>
+<ul>
+<li class="chapter" data-level="3.1.1" data-path="rgb-classification.html"><a href="rgb-classification.html#raster-texture-panchromatic"><i class="fa fa-check"></i><b>3.1.1</b> Raster Texture: Panchromatic</a></li>
+<li class="chapter" data-level="3.1.2" data-path="rgb-classification.html"><a href="rgb-classification.html#raster-texture-grvi"><i class="fa fa-check"></i><b>3.1.2</b> Raster Texture: GRVI</a></li>
+<li class="chapter" data-level="3.1.3" data-path="rgb-classification.html"><a href="rgb-classification.html#plot-textural-rasters"><i class="fa fa-check"></i><b>3.1.3</b> Plot textural rasters</a></li>
+</ul></li>
+<li class="chapter" data-level="3.2" data-path="rgb-classification.html"><a href="rgb-classification.html#unsupervised-classification"><i class="fa fa-check"></i><b>3.2</b> Unsupervised classification</a></li>
+<li class="chapter" data-level="3.3" data-path="rgb-classification.html"><a href="rgb-classification.html#supervised-classification"><i class="fa fa-check"></i><b>3.3</b> Supervised classification</a></li>
+</ul></li>
+<li class="chapter" data-level="4" data-path="point-cloud-classification.html"><a href="point-cloud-classification.html"><i class="fa fa-check"></i><b>4</b> Point Cloud Classification</a>
+<ul>
+<li class="chapter" data-level="4.1" data-path="point-cloud-classification.html"><a href="point-cloud-classification.html#process-raw-point-cloud"><i class="fa fa-check"></i><b>4.1</b> Process Raw Point Cloud</a></li>
+</ul></li>
+</ul>
+
+      </nav>
+    </div>
+
+    <div class="book-body">
+      <div class="body-inner">
+        <div class="book-header" role="navigation">
+          <h1>
+            <i class="fa fa-circle-o-notch fa-spin"></i><a href="./">Aerial Imagery and Point Cloud Data for Slash Pile Quantification</a>
+          </h1>
+        </div>
+
+        <div class="page-wrapper" tabindex="-1" role="main">
+          <div class="page-inner">
+
+            <section class="normal" id="section-">
+<div id="rgb-classification" class="section level1 hasAnchor" number="3">
+<h1><span class="header-section-number">Section 3</span> RGB Classification<a href="rgb-classification.html#rgb-classification" class="anchor-section" aria-label="Anchor link to header"></a></h1>
+<p>We’ll use the RGB imagery alone to explore unsupervised and supervised classification algorithms.</p>
+<p>Ultimately, it is likely we will use an object-based image analysis (OBIA) approach. OBIA is a technique (or a set of techniques) used to analyze digital images that was developed relatively recently in comparison to ‘classic’ pixel-based image approaches (<a href="https://doi.org/10.1016/S0304-3800(03)00139-X">Burnett and Blaschke 2003</a>). We will probably implement the OBIA approach using the <code>SegOptim</code> <a href="https://github.com/joaofgoncalves/SegOptim">package</a> presented by <a href="https://doi.org/10.1016/j.jag.2018.11.011">Goncalves et al. (2019)</a></p>
+<p>In future sections we will explore, integration of spectral data with the 3D point cloud data (i.e. “data fusion”) to test distinguishing the woody material in slash piles from surrounding vegetation or soil. Field-measured slash piles will be used as the ground truth data to perform a confusion matrix-based validation accuracy assessment of the methods.</p>
+<p><a href="https://doi.org/10.3390/rs14122896">Norton et al. (2022)</a> combined LiDAR and hyperspectral data in a data fusion approach for classification of semi-arid woody cover species and achieved accuracies ranging from 86% to 98% for five woody species</p>
+<p>We’ll see how far we can get without hyperspectral data since this data is less common</p>
+<div id="textural-covariates" class="section level2 hasAnchor" number="3.1">
+<h2><span class="header-section-number">3.1</span> Textural covariates<a href="rgb-classification.html#textural-covariates" class="anchor-section" aria-label="Anchor link to header"></a></h2>
+<p><a href="https://doi.org/10.1002/ecs2.2594">Rodman et al. (2019)</a> described a method using a series of image processing steps to add supplemental information describing the texture and context surrounding each image pixel in their analysis of forest cover change based only on panchromatic imagery (i.e. “black and white”). These textural covariates may be helpful for identifying slash piles, especially if we only have RGB data.</p>
+<p>first, we’ll make a single panchromatic band (the mean of red, green, and blue values) from our RGB imagery</p>
+<div class="sourceCode" id="cb35"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb35-1"><a href="rgb-classification.html#cb35-1" tabindex="-1"></a>rgb_to_pan_fn <span class="ot">&lt;-</span> <span class="cf">function</span>(r, g, b) {</span>
+<span id="cb35-2"><a href="rgb-classification.html#cb35-2" tabindex="-1"></a>  pan <span class="ot">&lt;-</span> (r <span class="sc">+</span> g <span class="sc">+</span> b)<span class="sc">/</span><span class="dv">3</span></span>
+<span id="cb35-3"><a href="rgb-classification.html#cb35-3" tabindex="-1"></a>  <span class="co"># replace all 0&#39;s with na</span></span>
+<span id="cb35-4"><a href="rgb-classification.html#cb35-4" tabindex="-1"></a>  pan <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">subst</span>(pan, <span class="at">from =</span> <span class="dv">0</span>, <span class="at">to =</span> <span class="cn">NA</span>)</span>
+<span id="cb35-5"><a href="rgb-classification.html#cb35-5" tabindex="-1"></a>  <span class="fu">return</span>(pan)</span>
+<span id="cb35-6"><a href="rgb-classification.html#cb35-6" tabindex="-1"></a>}</span>
+<span id="cb35-7"><a href="rgb-classification.html#cb35-7" tabindex="-1"></a>panchromatic_rast <span class="ot">&lt;-</span> <span class="fu">rgb_to_pan_fn</span>(</span>
+<span id="cb35-8"><a href="rgb-classification.html#cb35-8" tabindex="-1"></a>  ortho_rast[[<span class="dv">1</span>]], ortho_rast[[<span class="dv">2</span>]], ortho_rast[[<span class="dv">3</span>]]</span>
+<span id="cb35-9"><a href="rgb-classification.html#cb35-9" tabindex="-1"></a>)</span></code></pre></div>
+<p>quick plot</p>
+<div class="sourceCode" id="cb36"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb36-1"><a href="rgb-classification.html#cb36-1" tabindex="-1"></a>terra<span class="sc">::</span><span class="fu">plot</span>(</span>
+<span id="cb36-2"><a href="rgb-classification.html#cb36-2" tabindex="-1"></a>  panchromatic_rast</span>
+<span id="cb36-3"><a href="rgb-classification.html#cb36-3" tabindex="-1"></a>  , <span class="at">col =</span> scales<span class="sc">::</span><span class="fu">pal_grey</span>(<span class="dv">0</span>, <span class="dv">1</span>)(<span class="dv">100</span>)</span>
+<span id="cb36-4"><a href="rgb-classification.html#cb36-4" tabindex="-1"></a>  , <span class="at">axes=</span>F, <span class="at">legend =</span> F</span>
+<span id="cb36-5"><a href="rgb-classification.html#cb36-5" tabindex="-1"></a>)</span></code></pre></div>
+<p><img src="manitou_slash_piles_files/figure-html/unnamed-chunk-26-1.png" width="1008" /></p>
+<p>nice, now we’ll make the textural covariates described by <a href="https://doi.org/10.1002/ecs2.2594">Rodman et al. (2019)</a></p>
+<blockquote>
+<p>During these steps, we identified locally dark pixels (indicative of individual trees surrounded by bright grassland) and quantified local standard deviation in brightness using moving windows at multiple scales (sensu Coburn and Roberts 2004; Fig. 3; Appendix S2). We combined these two layers with the original grayscale imagery to create three-band composite imagery (Fig. 3d). The combination of brightness, local minima, and standard deviation emphasizes differences in spectral reflectance that facilitate the separation of different forest structures (e.g., individual trees and dense stands) from non-forested areas. (p. 7)</p>
+</blockquote>
+<p>and from Appendix S2</p>
+<blockquote>
+<p>Our first metric identifies pixels that are darker than their surroundings (hereafter “local minima”). To identify local minima, we calculated the mean and standard deviation of pixel brightness at each scale (3-15 pixel windows). A pixel was considered to be darker than its surroundings if its brightness value was lower than the window mean minus two standard deviations. These calculations were made for each window size for each pixel, then summed across all window sizes (thus, local minima values range 0-7, where 7 indicates that a pixel is darker than its surroundings across all moving window sizes; Fig. 3b)</p>
+</blockquote>
+<blockquote>
+<p>For the second metric, we calculated the sum of standard deviation values across all window sizes (Fig. 3c). Standard deviation of pixel brightness is a simple version of local texture that can improve forest classification in high-resolution imagery. While standard deviation is more computationally efficient than many other texture metrics (e.g., entropy based on greylevel co-occurrence matrices), it may still yield comparable performance in classification (Coburn and Roberts 2004). Standard deviation appeared helpful in separating dark forest stands (low brightness, moderate variance) from more homogenous areas (low brightness, low variance; i.e., water bodies, shadows).</p>
+</blockquote>
+<blockquote>
+<p>We combined these three layers (brightness, local minima, and standard deviation) to create a three-band composite image (Fig. 3d)</p>
+</blockquote>
+<div class="sourceCode" id="cb37"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb37-1"><a href="rgb-classification.html#cb37-1" tabindex="-1"></a>rast_rodmanetal2019_fn <span class="ot">&lt;-</span> <span class="cf">function</span>(</span>
+<span id="cb37-2"><a href="rgb-classification.html#cb37-2" tabindex="-1"></a>    rast, <span class="at">windows_m =</span> <span class="fu">c</span>(<span class="dv">3</span>,<span class="dv">5</span>,<span class="dv">7</span>,<span class="dv">9</span>,<span class="dv">11</span>,<span class="dv">13</span>,<span class="dv">15</span>), <span class="at">scale_to_1m =</span> T</span>
+<span id="cb37-3"><a href="rgb-classification.html#cb37-3" tabindex="-1"></a>    , <span class="at">rast_nm =</span> <span class="st">&quot;panchromatic&quot;</span></span>
+<span id="cb37-4"><a href="rgb-classification.html#cb37-4" tabindex="-1"></a>) {</span>
+<span id="cb37-5"><a href="rgb-classification.html#cb37-5" tabindex="-1"></a>  rast <span class="ot">&lt;-</span> rast[[<span class="dv">1</span>]]</span>
+<span id="cb37-6"><a href="rgb-classification.html#cb37-6" tabindex="-1"></a>  </span>
+<span id="cb37-7"><a href="rgb-classification.html#cb37-7" tabindex="-1"></a>  <span class="co"># scale the windows based on resolution</span></span>
+<span id="cb37-8"><a href="rgb-classification.html#cb37-8" tabindex="-1"></a>  <span class="cf">if</span>(scale_to_1m){</span>
+<span id="cb37-9"><a href="rgb-classification.html#cb37-9" tabindex="-1"></a>    windows_m <span class="ot">&lt;-</span> <span class="fu">round_to_nearest_odd</span>(</span>
+<span id="cb37-10"><a href="rgb-classification.html#cb37-10" tabindex="-1"></a>      (<span class="dv">1</span><span class="sc">/</span>terra<span class="sc">::</span><span class="fu">res</span>(rast)[<span class="dv">1</span>])<span class="sc">*</span>windows_m</span>
+<span id="cb37-11"><a href="rgb-classification.html#cb37-11" tabindex="-1"></a>    )</span>
+<span id="cb37-12"><a href="rgb-classification.html#cb37-12" tabindex="-1"></a>  }<span class="cf">else</span>{</span>
+<span id="cb37-13"><a href="rgb-classification.html#cb37-13" tabindex="-1"></a>    windows_m <span class="ot">&lt;-</span> <span class="fu">round_to_nearest_odd</span>(windows_m)</span>
+<span id="cb37-14"><a href="rgb-classification.html#cb37-14" tabindex="-1"></a>  }</span>
+<span id="cb37-15"><a href="rgb-classification.html#cb37-15" tabindex="-1"></a>  </span>
+<span id="cb37-16"><a href="rgb-classification.html#cb37-16" tabindex="-1"></a>  <span class="co"># means</span></span>
+<span id="cb37-17"><a href="rgb-classification.html#cb37-17" tabindex="-1"></a>  r_means <span class="ot">&lt;-</span> windows_m <span class="sc">%&gt;%</span> </span>
+<span id="cb37-18"><a href="rgb-classification.html#cb37-18" tabindex="-1"></a>    purrr<span class="sc">::</span><span class="fu">map</span>(\(w)</span>
+<span id="cb37-19"><a href="rgb-classification.html#cb37-19" tabindex="-1"></a>      terra<span class="sc">::</span><span class="fu">focal</span>(<span class="at">x =</span> rast, <span class="at">w =</span> w, <span class="at">fun =</span> <span class="st">&quot;mean&quot;</span>, <span class="at">na.rm =</span> T)</span>
+<span id="cb37-20"><a href="rgb-classification.html#cb37-20" tabindex="-1"></a>    )</span>
+<span id="cb37-21"><a href="rgb-classification.html#cb37-21" tabindex="-1"></a>  <span class="co"># r_means[[7]] %&gt;% terra::plot(col = scales::pal_grey(0, 1)(100))</span></span>
+<span id="cb37-22"><a href="rgb-classification.html#cb37-22" tabindex="-1"></a>  </span>
+<span id="cb37-23"><a href="rgb-classification.html#cb37-23" tabindex="-1"></a>  <span class="co"># sds</span></span>
+<span id="cb37-24"><a href="rgb-classification.html#cb37-24" tabindex="-1"></a>  r_sds <span class="ot">&lt;-</span> windows_m <span class="sc">%&gt;%</span> </span>
+<span id="cb37-25"><a href="rgb-classification.html#cb37-25" tabindex="-1"></a>    purrr<span class="sc">::</span><span class="fu">map</span>(\(w)</span>
+<span id="cb37-26"><a href="rgb-classification.html#cb37-26" tabindex="-1"></a>      terra<span class="sc">::</span><span class="fu">focal</span>(<span class="at">x =</span> rast, <span class="at">w =</span> w, <span class="at">fun =</span> <span class="st">&quot;sd&quot;</span>, <span class="at">na.rm =</span> T)</span>
+<span id="cb37-27"><a href="rgb-classification.html#cb37-27" tabindex="-1"></a>    )</span>
+<span id="cb37-28"><a href="rgb-classification.html#cb37-28" tabindex="-1"></a>  <span class="co"># r_sds[[5]] %&gt;% terra::plot(col = scales::pal_grey(0, 1)(100))</span></span>
+<span id="cb37-29"><a href="rgb-classification.html#cb37-29" tabindex="-1"></a>  </span>
+<span id="cb37-30"><a href="rgb-classification.html#cb37-30" tabindex="-1"></a>  <span class="co"># local min</span></span>
+<span id="cb37-31"><a href="rgb-classification.html#cb37-31" tabindex="-1"></a>  local_min_fn <span class="ot">&lt;-</span> <span class="cf">function</span>(rast, mean, sd) {</span>
+<span id="cb37-32"><a href="rgb-classification.html#cb37-32" tabindex="-1"></a>    <span class="fu">as.numeric</span>(rast <span class="sc">&lt;</span> ( mean<span class="sc">-</span>(sd<span class="sc">*</span><span class="dv">2</span>) ))</span>
+<span id="cb37-33"><a href="rgb-classification.html#cb37-33" tabindex="-1"></a>  }</span>
+<span id="cb37-34"><a href="rgb-classification.html#cb37-34" tabindex="-1"></a>  </span>
+<span id="cb37-35"><a href="rgb-classification.html#cb37-35" tabindex="-1"></a>  r_local_min <span class="ot">&lt;-</span> <span class="dv">1</span><span class="sc">:</span><span class="fu">length</span>(r_means) <span class="sc">%&gt;%</span> </span>
+<span id="cb37-36"><a href="rgb-classification.html#cb37-36" tabindex="-1"></a>    purrr<span class="sc">::</span><span class="fu">map</span>(\(i)</span>
+<span id="cb37-37"><a href="rgb-classification.html#cb37-37" tabindex="-1"></a>      <span class="fu">local_min_fn</span>(<span class="at">rast =</span> rast, <span class="at">mean =</span> r_means[[i]], <span class="at">sd =</span> r_sds[[i]])</span>
+<span id="cb37-38"><a href="rgb-classification.html#cb37-38" tabindex="-1"></a>    )</span>
+<span id="cb37-39"><a href="rgb-classification.html#cb37-39" tabindex="-1"></a>  <span class="co"># r_local_min[[5]] %&gt;% terra::plot()</span></span>
+<span id="cb37-40"><a href="rgb-classification.html#cb37-40" tabindex="-1"></a>  </span>
+<span id="cb37-41"><a href="rgb-classification.html#cb37-41" tabindex="-1"></a>  <span class="co"># aggregate local min</span></span>
+<span id="cb37-42"><a href="rgb-classification.html#cb37-42" tabindex="-1"></a>  r_local_min_agg <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">rast</span>(r_local_min) <span class="sc">%&gt;%</span> </span>
+<span id="cb37-43"><a href="rgb-classification.html#cb37-43" tabindex="-1"></a>    <span class="fu">cumsum</span>()</span>
+<span id="cb37-44"><a href="rgb-classification.html#cb37-44" tabindex="-1"></a>  </span>
+<span id="cb37-45"><a href="rgb-classification.html#cb37-45" tabindex="-1"></a>  <span class="co"># get the last of the local mins</span></span>
+<span id="cb37-46"><a href="rgb-classification.html#cb37-46" tabindex="-1"></a>  local_minima <span class="ot">&lt;-</span> r_local_min_agg[[terra<span class="sc">::</span><span class="fu">nlyr</span>(r_local_min_agg)]]</span>
+<span id="cb37-47"><a href="rgb-classification.html#cb37-47" tabindex="-1"></a>  </span>
+<span id="cb37-48"><a href="rgb-classification.html#cb37-48" tabindex="-1"></a>  <span class="co"># aggregate local sd</span></span>
+<span id="cb37-49"><a href="rgb-classification.html#cb37-49" tabindex="-1"></a>  r_sds_agg <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">rast</span>(r_sds) <span class="sc">%&gt;%</span> </span>
+<span id="cb37-50"><a href="rgb-classification.html#cb37-50" tabindex="-1"></a>    <span class="fu">cumsum</span>()</span>
+<span id="cb37-51"><a href="rgb-classification.html#cb37-51" tabindex="-1"></a>  </span>
+<span id="cb37-52"><a href="rgb-classification.html#cb37-52" tabindex="-1"></a>  <span class="co"># get the last of the local mins</span></span>
+<span id="cb37-53"><a href="rgb-classification.html#cb37-53" tabindex="-1"></a>  local_sd <span class="ot">&lt;-</span> r_sds_agg[[terra<span class="sc">::</span><span class="fu">nlyr</span>(r_sds_agg)]]</span>
+<span id="cb37-54"><a href="rgb-classification.html#cb37-54" tabindex="-1"></a>  </span>
+<span id="cb37-55"><a href="rgb-classification.html#cb37-55" tabindex="-1"></a>  <span class="co"># composite</span></span>
+<span id="cb37-56"><a href="rgb-classification.html#cb37-56" tabindex="-1"></a>  composite <span class="ot">&lt;-</span> <span class="fu">c</span>(rast, local_sd, local_minima)</span>
+<span id="cb37-57"><a href="rgb-classification.html#cb37-57" tabindex="-1"></a>  <span class="fu">names</span>(composite) <span class="ot">&lt;-</span> <span class="fu">c</span>(rast_nm, <span class="st">&quot;local_sd&quot;</span>, <span class="st">&quot;local_minima&quot;</span>)</span>
+<span id="cb37-58"><a href="rgb-classification.html#cb37-58" tabindex="-1"></a>  </span>
+<span id="cb37-59"><a href="rgb-classification.html#cb37-59" tabindex="-1"></a>  <span class="co"># names</span></span>
+<span id="cb37-60"><a href="rgb-classification.html#cb37-60" tabindex="-1"></a>  <span class="fu">names</span>(local_minima) <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;local_minima&quot;</span>)</span>
+<span id="cb37-61"><a href="rgb-classification.html#cb37-61" tabindex="-1"></a>  <span class="fu">names</span>(local_sd) <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;local_sd&quot;</span>)</span>
+<span id="cb37-62"><a href="rgb-classification.html#cb37-62" tabindex="-1"></a>  </span>
+<span id="cb37-63"><a href="rgb-classification.html#cb37-63" tabindex="-1"></a>  <span class="fu">return</span>(<span class="fu">list</span>(</span>
+<span id="cb37-64"><a href="rgb-classification.html#cb37-64" tabindex="-1"></a>    <span class="at">local_minima =</span> local_minima</span>
+<span id="cb37-65"><a href="rgb-classification.html#cb37-65" tabindex="-1"></a>    , <span class="at">local_sd =</span> local_sd</span>
+<span id="cb37-66"><a href="rgb-classification.html#cb37-66" tabindex="-1"></a>    , <span class="at">composite =</span> composite</span>
+<span id="cb37-67"><a href="rgb-classification.html#cb37-67" tabindex="-1"></a>  ))</span>
+<span id="cb37-68"><a href="rgb-classification.html#cb37-68" tabindex="-1"></a>}</span></code></pre></div>
+<div id="raster-texture-panchromatic" class="section level3 hasAnchor" number="3.1.1">
+<h3><span class="header-section-number">3.1.1</span> Raster Texture: Panchromatic<a href="rgb-classification.html#raster-texture-panchromatic" class="anchor-section" aria-label="Anchor link to header"></a></h3>
+<p>implement our <code>rast_rodmanetal2019_fn</code> function</p>
+<div class="sourceCode" id="cb38"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb38-1"><a href="rgb-classification.html#cb38-1" tabindex="-1"></a>rodmanetal2019_panchromatic_rast <span class="ot">&lt;-</span> <span class="fu">rast_rodmanetal2019_fn</span>(</span>
+<span id="cb38-2"><a href="rgb-classification.html#cb38-2" tabindex="-1"></a>  <span class="at">rast =</span> panchromatic_rast</span>
+<span id="cb38-3"><a href="rgb-classification.html#cb38-3" tabindex="-1"></a>  , <span class="at">rast_nm =</span> <span class="st">&quot;panchromatic&quot;</span></span>
+<span id="cb38-4"><a href="rgb-classification.html#cb38-4" tabindex="-1"></a>  , <span class="at">scale_to_1m =</span> F</span>
+<span id="cb38-5"><a href="rgb-classification.html#cb38-5" tabindex="-1"></a>)</span></code></pre></div>
+<p>plot of “local minima” pixels that are darker than their surroundings</p>
+<div class="sourceCode" id="cb39"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb39-1"><a href="rgb-classification.html#cb39-1" tabindex="-1"></a><span class="co"># plot</span></span>
+<span id="cb39-2"><a href="rgb-classification.html#cb39-2" tabindex="-1"></a>terra<span class="sc">::</span><span class="fu">plot</span>(</span>
+<span id="cb39-3"><a href="rgb-classification.html#cb39-3" tabindex="-1"></a>  rodmanetal2019_panchromatic_rast<span class="sc">$</span>local_minima</span>
+<span id="cb39-4"><a href="rgb-classification.html#cb39-4" tabindex="-1"></a>  , <span class="at">col =</span> scales<span class="sc">::</span><span class="fu">pal_grey</span>(<span class="dv">0</span>, <span class="dv">1</span>)(<span class="dv">8</span>)</span>
+<span id="cb39-5"><a href="rgb-classification.html#cb39-5" tabindex="-1"></a>  , <span class="at">axes=</span>F, <span class="at">legend =</span> F</span>
+<span id="cb39-6"><a href="rgb-classification.html#cb39-6" tabindex="-1"></a>)</span></code></pre></div>
+<p><img src="manitou_slash_piles_files/figure-html/unnamed-chunk-30-1.png" width="1008" /></p>
+<p>plot of standard deviation pixel brightness which is a simple version of local texture that can improve forest classification in high-resolution imagery</p>
+<div class="sourceCode" id="cb40"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb40-1"><a href="rgb-classification.html#cb40-1" tabindex="-1"></a>terra<span class="sc">::</span><span class="fu">plot</span>(</span>
+<span id="cb40-2"><a href="rgb-classification.html#cb40-2" tabindex="-1"></a>  rodmanetal2019_panchromatic_rast<span class="sc">$</span>local_sd</span>
+<span id="cb40-3"><a href="rgb-classification.html#cb40-3" tabindex="-1"></a>  , <span class="at">col =</span> scales<span class="sc">::</span><span class="fu">pal_grey</span>(<span class="dv">0</span>, <span class="dv">1</span>)(<span class="dv">100</span>)</span>
+<span id="cb40-4"><a href="rgb-classification.html#cb40-4" tabindex="-1"></a>  , <span class="at">axes=</span>F, <span class="at">legend =</span> F</span>
+<span id="cb40-5"><a href="rgb-classification.html#cb40-5" tabindex="-1"></a>)</span></code></pre></div>
+<p><img src="manitou_slash_piles_files/figure-html/unnamed-chunk-31-1.png" width="1008" /></p>
+<p>plot of these combined panchromatic, local minima, and standard deviation images were merged to create a three-band composite which can be segmented to identify areas of relatively homogeneous brightness, contrast, and variance</p>
+<div class="sourceCode" id="cb41"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb41-1"><a href="rgb-classification.html#cb41-1" tabindex="-1"></a>terra<span class="sc">::</span><span class="fu">plotRGB</span>(</span>
+<span id="cb41-2"><a href="rgb-classification.html#cb41-2" tabindex="-1"></a>  rodmanetal2019_panchromatic_rast<span class="sc">$</span>composite</span>
+<span id="cb41-3"><a href="rgb-classification.html#cb41-3" tabindex="-1"></a>  <span class="co"># , scale = c(255,7,520)</span></span>
+<span id="cb41-4"><a href="rgb-classification.html#cb41-4" tabindex="-1"></a>  , <span class="at">stretch =</span> <span class="st">&quot;hist&quot;</span>, <span class="at">colNA =</span> <span class="st">&quot;transparent&quot;</span></span>
+<span id="cb41-5"><a href="rgb-classification.html#cb41-5" tabindex="-1"></a>)</span>
+<span id="cb41-6"><a href="rgb-classification.html#cb41-6" tabindex="-1"></a><span class="co"># add polys</span></span>
+<span id="cb41-7"><a href="rgb-classification.html#cb41-7" tabindex="-1"></a>terra<span class="sc">::</span><span class="fu">plot</span>(</span>
+<span id="cb41-8"><a href="rgb-classification.html#cb41-8" tabindex="-1"></a>  slash_piles_polys <span class="sc">%&gt;%</span> sf<span class="sc">::</span><span class="fu">st_transform</span>(terra<span class="sc">::</span><span class="fu">crs</span>(grvi_rast)) <span class="sc">%&gt;%</span> terra<span class="sc">::</span><span class="fu">vect</span>()</span>
+<span id="cb41-9"><a href="rgb-classification.html#cb41-9" tabindex="-1"></a>  , <span class="at">add =</span> T, <span class="at">border =</span> <span class="st">&quot;white&quot;</span>, <span class="at">col =</span> <span class="cn">NA</span></span>
+<span id="cb41-10"><a href="rgb-classification.html#cb41-10" tabindex="-1"></a>)</span></code></pre></div>
+<p><img src="manitou_slash_piles_files/figure-html/unnamed-chunk-32-1.png" width="1008" /></p>
+</div>
+<div id="raster-texture-grvi" class="section level3 hasAnchor" number="3.1.2">
+<h3><span class="header-section-number">3.1.2</span> Raster Texture: GRVI<a href="rgb-classification.html#raster-texture-grvi" class="anchor-section" aria-label="Anchor link to header"></a></h3>
+<p>implement our <code>rast_rodmanetal2019_fn</code> function</p>
+<div class="sourceCode" id="cb42"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb42-1"><a href="rgb-classification.html#cb42-1" tabindex="-1"></a>rodmanetal2019_grvi_rast <span class="ot">&lt;-</span> <span class="fu">rast_rodmanetal2019_fn</span>(</span>
+<span id="cb42-2"><a href="rgb-classification.html#cb42-2" tabindex="-1"></a>  <span class="at">rast =</span> grvi_rast</span>
+<span id="cb42-3"><a href="rgb-classification.html#cb42-3" tabindex="-1"></a>  , <span class="at">rast_nm =</span> <span class="st">&quot;grvi&quot;</span></span>
+<span id="cb42-4"><a href="rgb-classification.html#cb42-4" tabindex="-1"></a>  , <span class="at">scale_to_1m =</span> F</span>
+<span id="cb42-5"><a href="rgb-classification.html#cb42-5" tabindex="-1"></a>)</span></code></pre></div>
+<p>plot of these combined GRVI</p>
+<div class="sourceCode" id="cb43"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb43-1"><a href="rgb-classification.html#cb43-1" tabindex="-1"></a>terra<span class="sc">::</span><span class="fu">plotRGB</span>(</span>
+<span id="cb43-2"><a href="rgb-classification.html#cb43-2" tabindex="-1"></a>  rodmanetal2019_grvi_rast<span class="sc">$</span>composite</span>
+<span id="cb43-3"><a href="rgb-classification.html#cb43-3" tabindex="-1"></a>  <span class="co"># , scale = c(255,7,520)</span></span>
+<span id="cb43-4"><a href="rgb-classification.html#cb43-4" tabindex="-1"></a>  , <span class="at">stretch =</span> <span class="st">&quot;hist&quot;</span>, <span class="at">colNA =</span> <span class="st">&quot;transparent&quot;</span></span>
+<span id="cb43-5"><a href="rgb-classification.html#cb43-5" tabindex="-1"></a>)</span>
+<span id="cb43-6"><a href="rgb-classification.html#cb43-6" tabindex="-1"></a><span class="co"># add polys</span></span>
+<span id="cb43-7"><a href="rgb-classification.html#cb43-7" tabindex="-1"></a>terra<span class="sc">::</span><span class="fu">plot</span>(</span>
+<span id="cb43-8"><a href="rgb-classification.html#cb43-8" tabindex="-1"></a>  slash_piles_polys <span class="sc">%&gt;%</span> sf<span class="sc">::</span><span class="fu">st_transform</span>(terra<span class="sc">::</span><span class="fu">crs</span>(grvi_rast)) <span class="sc">%&gt;%</span> terra<span class="sc">::</span><span class="fu">vect</span>()</span>
+<span id="cb43-9"><a href="rgb-classification.html#cb43-9" tabindex="-1"></a>  , <span class="at">add =</span> T, <span class="at">border =</span> <span class="st">&quot;white&quot;</span>, <span class="at">col =</span> <span class="cn">NA</span></span>
+<span id="cb43-10"><a href="rgb-classification.html#cb43-10" tabindex="-1"></a>)</span></code></pre></div>
+<p><img src="manitou_slash_piles_files/figure-html/unnamed-chunk-34-1.png" width="1008" /></p>
+</div>
+<div id="plot-textural-rasters" class="section level3 hasAnchor" number="3.1.3">
+<h3><span class="header-section-number">3.1.3</span> Plot textural rasters<a href="rgb-classification.html#plot-textural-rasters" class="anchor-section" aria-label="Anchor link to header"></a></h3>
+<p>let’s look at these textural rasters for some of the piles</p>
+<div class="sourceCode" id="cb44"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb44-1"><a href="rgb-classification.html#cb44-1" tabindex="-1"></a>p_fn_temp <span class="ot">&lt;-</span> <span class="cf">function</span>(</span>
+<span id="cb44-2"><a href="rgb-classification.html#cb44-2" tabindex="-1"></a>    rn</span>
+<span id="cb44-3"><a href="rgb-classification.html#cb44-3" tabindex="-1"></a>    , <span class="at">df =</span> slash_piles_polys</span>
+<span id="cb44-4"><a href="rgb-classification.html#cb44-4" tabindex="-1"></a>    , <span class="at">composite_rast =</span> rodmanetal2019_grvi_rast<span class="sc">$</span>composite</span>
+<span id="cb44-5"><a href="rgb-classification.html#cb44-5" tabindex="-1"></a>    , <span class="at">crs =</span> terra<span class="sc">::</span><span class="fu">crs</span>(ortho_rast)</span>
+<span id="cb44-6"><a href="rgb-classification.html#cb44-6" tabindex="-1"></a>    , <span class="at">my_title =</span> <span class="st">&quot;&quot;</span></span>
+<span id="cb44-7"><a href="rgb-classification.html#cb44-7" tabindex="-1"></a>) {</span>
+<span id="cb44-8"><a href="rgb-classification.html#cb44-8" tabindex="-1"></a>  <span class="co"># scale the buffer based on the largest</span></span>
+<span id="cb44-9"><a href="rgb-classification.html#cb44-9" tabindex="-1"></a>    d_temp <span class="ot">&lt;-</span> df <span class="sc">%&gt;%</span></span>
+<span id="cb44-10"><a href="rgb-classification.html#cb44-10" tabindex="-1"></a>      dplyr<span class="sc">::</span><span class="fu">arrange</span>(<span class="fu">tolower</span>(comment), <span class="fu">desc</span>(diameter)) <span class="sc">%&gt;%</span> </span>
+<span id="cb44-11"><a href="rgb-classification.html#cb44-11" tabindex="-1"></a>      dplyr<span class="sc">::</span><span class="fu">slice</span>(rn) <span class="sc">%&gt;%</span> </span>
+<span id="cb44-12"><a href="rgb-classification.html#cb44-12" tabindex="-1"></a>      sf<span class="sc">::</span><span class="fu">st_transform</span>(crs)</span>
+<span id="cb44-13"><a href="rgb-classification.html#cb44-13" tabindex="-1"></a>    </span>
+<span id="cb44-14"><a href="rgb-classification.html#cb44-14" tabindex="-1"></a>    <span class="co"># plt classifier</span></span>
+<span id="cb44-15"><a href="rgb-classification.html#cb44-15" tabindex="-1"></a>    <span class="co"># convert to stars</span></span>
+<span id="cb44-16"><a href="rgb-classification.html#cb44-16" tabindex="-1"></a>    comp_st <span class="ot">&lt;-</span> composite_rast <span class="sc">%&gt;%</span>  </span>
+<span id="cb44-17"><a href="rgb-classification.html#cb44-17" tabindex="-1"></a>      terra<span class="sc">::</span><span class="fu">subset</span>(<span class="at">subset =</span> <span class="fu">c</span>(<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">3</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb44-18"><a href="rgb-classification.html#cb44-18" tabindex="-1"></a>      terra<span class="sc">::</span><span class="fu">crop</span>(</span>
+<span id="cb44-19"><a href="rgb-classification.html#cb44-19" tabindex="-1"></a>        d_temp <span class="sc">%&gt;%</span> sf<span class="sc">::</span><span class="fu">st_buffer</span>(<span class="dv">20</span>) <span class="sc">%&gt;%</span> terra<span class="sc">::</span><span class="fu">vect</span>()</span>
+<span id="cb44-20"><a href="rgb-classification.html#cb44-20" tabindex="-1"></a>      ) <span class="sc">%&gt;%</span> </span>
+<span id="cb44-21"><a href="rgb-classification.html#cb44-21" tabindex="-1"></a>      <span class="co"># terra::aggregate(fact = 2, fun = &quot;mean&quot;, na.rm = T) %&gt;% </span></span>
+<span id="cb44-22"><a href="rgb-classification.html#cb44-22" tabindex="-1"></a>      stars<span class="sc">::</span><span class="fu">st_as_stars</span>()</span>
+<span id="cb44-23"><a href="rgb-classification.html#cb44-23" tabindex="-1"></a>    </span>
+<span id="cb44-24"><a href="rgb-classification.html#cb44-24" tabindex="-1"></a>    <span class="co"># convert to rgb</span></span>
+<span id="cb44-25"><a href="rgb-classification.html#cb44-25" tabindex="-1"></a>    comp_rgb <span class="ot">&lt;-</span> stars<span class="sc">::</span><span class="fu">st_rgb</span>(</span>
+<span id="cb44-26"><a href="rgb-classification.html#cb44-26" tabindex="-1"></a>      comp_st[,,,<span class="dv">1</span><span class="sc">:</span><span class="dv">3</span>]</span>
+<span id="cb44-27"><a href="rgb-classification.html#cb44-27" tabindex="-1"></a>      , <span class="at">dimension =</span> <span class="dv">3</span></span>
+<span id="cb44-28"><a href="rgb-classification.html#cb44-28" tabindex="-1"></a>      , <span class="at">use_alpha =</span> <span class="cn">FALSE</span></span>
+<span id="cb44-29"><a href="rgb-classification.html#cb44-29" tabindex="-1"></a>      <span class="co"># , stretch = &quot;histogram&quot;</span></span>
+<span id="cb44-30"><a href="rgb-classification.html#cb44-30" tabindex="-1"></a>      , <span class="at">probs =</span> <span class="fu">c</span>(<span class="fl">0.002</span>, <span class="fl">0.998</span>)</span>
+<span id="cb44-31"><a href="rgb-classification.html#cb44-31" tabindex="-1"></a>      , <span class="at">stretch =</span> <span class="st">&quot;percent&quot;</span></span>
+<span id="cb44-32"><a href="rgb-classification.html#cb44-32" tabindex="-1"></a>    )</span>
+<span id="cb44-33"><a href="rgb-classification.html#cb44-33" tabindex="-1"></a>    <span class="co"># ggplot</span></span>
+<span id="cb44-34"><a href="rgb-classification.html#cb44-34" tabindex="-1"></a>    comp_temp <span class="ot">&lt;-</span> ggplot2<span class="sc">::</span><span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb44-35"><a href="rgb-classification.html#cb44-35" tabindex="-1"></a>      stars<span class="sc">::</span><span class="fu">geom_stars</span>(<span class="at">data =</span> comp_rgb[]) <span class="sc">+</span></span>
+<span id="cb44-36"><a href="rgb-classification.html#cb44-36" tabindex="-1"></a>      ggplot2<span class="sc">::</span><span class="fu">scale_fill_identity</span>(<span class="at">na.value =</span> <span class="st">&quot;transparent&quot;</span>) <span class="sc">+</span> <span class="co"># !!! don&#39;t take this out or RGB plot will kill your computer</span></span>
+<span id="cb44-37"><a href="rgb-classification.html#cb44-37" tabindex="-1"></a>      ggplot2<span class="sc">::</span><span class="fu">geom_sf</span>(<span class="at">data =</span> d_temp, <span class="at">fill =</span> <span class="cn">NA</span>, <span class="at">color =</span> <span class="st">&quot;white&quot;</span>, <span class="at">lwd =</span> <span class="fl">0.3</span>) <span class="sc">+</span></span>
+<span id="cb44-38"><a href="rgb-classification.html#cb44-38" tabindex="-1"></a>      ggplot2<span class="sc">::</span><span class="fu">scale_x_continuous</span>(<span class="at">expand =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="dv">0</span>)) <span class="sc">+</span></span>
+<span id="cb44-39"><a href="rgb-classification.html#cb44-39" tabindex="-1"></a>      ggplot2<span class="sc">::</span><span class="fu">scale_y_continuous</span>(<span class="at">expand =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="dv">0</span>)) <span class="sc">+</span></span>
+<span id="cb44-40"><a href="rgb-classification.html#cb44-40" tabindex="-1"></a>      ggplot2<span class="sc">::</span><span class="fu">labs</span>(</span>
+<span id="cb44-41"><a href="rgb-classification.html#cb44-41" tabindex="-1"></a>        <span class="at">x =</span> <span class="st">&quot;&quot;</span></span>
+<span id="cb44-42"><a href="rgb-classification.html#cb44-42" tabindex="-1"></a>        , <span class="at">y =</span> <span class="st">&quot;&quot;</span></span>
+<span id="cb44-43"><a href="rgb-classification.html#cb44-43" tabindex="-1"></a>        , <span class="at">subtitle =</span> my_title</span>
+<span id="cb44-44"><a href="rgb-classification.html#cb44-44" tabindex="-1"></a>      ) <span class="sc">+</span></span>
+<span id="cb44-45"><a href="rgb-classification.html#cb44-45" tabindex="-1"></a>      ggplot2<span class="sc">::</span><span class="fu">theme_void</span>() <span class="sc">+</span></span>
+<span id="cb44-46"><a href="rgb-classification.html#cb44-46" tabindex="-1"></a>      ggplot2<span class="sc">::</span><span class="fu">theme</span>(</span>
+<span id="cb44-47"><a href="rgb-classification.html#cb44-47" tabindex="-1"></a>        <span class="at">legend.position =</span> <span class="st">&quot;none&quot;</span> <span class="co"># c(0.5,1)</span></span>
+<span id="cb44-48"><a href="rgb-classification.html#cb44-48" tabindex="-1"></a>        , <span class="at">legend.direction =</span> <span class="st">&quot;horizontal&quot;</span></span>
+<span id="cb44-49"><a href="rgb-classification.html#cb44-49" tabindex="-1"></a>        , <span class="at">legend.margin =</span> <span class="fu">margin</span>(<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">0</span>)</span>
+<span id="cb44-50"><a href="rgb-classification.html#cb44-50" tabindex="-1"></a>        , <span class="at">legend.text =</span> <span class="fu">element_text</span>(<span class="at">size =</span> <span class="dv">8</span>)</span>
+<span id="cb44-51"><a href="rgb-classification.html#cb44-51" tabindex="-1"></a>        , <span class="at">legend.title =</span> <span class="fu">element_text</span>(<span class="at">size =</span> <span class="dv">8</span>)</span>
+<span id="cb44-52"><a href="rgb-classification.html#cb44-52" tabindex="-1"></a>        , <span class="at">legend.key =</span> <span class="fu">element_rect</span>(<span class="at">fill =</span> <span class="st">&quot;white&quot;</span>)</span>
+<span id="cb44-53"><a href="rgb-classification.html#cb44-53" tabindex="-1"></a>        <span class="co"># , plot.title = ggtext::element_markdown(size = 10, hjust = 0.5)</span></span>
+<span id="cb44-54"><a href="rgb-classification.html#cb44-54" tabindex="-1"></a>        , <span class="at">plot.title =</span> <span class="fu">element_text</span>(<span class="at">size =</span> <span class="dv">8</span>, <span class="at">hjust =</span> <span class="fl">0.5</span>, <span class="at">face =</span> <span class="st">&quot;bold&quot;</span>)</span>
+<span id="cb44-55"><a href="rgb-classification.html#cb44-55" tabindex="-1"></a>        , <span class="at">plot.subtitle =</span> <span class="fu">element_text</span>(<span class="at">size =</span> <span class="dv">6</span>, <span class="at">hjust =</span> <span class="fl">0.5</span>, <span class="at">face =</span> <span class="st">&quot;italic&quot;</span>)</span>
+<span id="cb44-56"><a href="rgb-classification.html#cb44-56" tabindex="-1"></a>      )</span>
+<span id="cb44-57"><a href="rgb-classification.html#cb44-57" tabindex="-1"></a>    </span>
+<span id="cb44-58"><a href="rgb-classification.html#cb44-58" tabindex="-1"></a>  plt_temp <span class="ot">&lt;-</span> comp_temp</span>
+<span id="cb44-59"><a href="rgb-classification.html#cb44-59" tabindex="-1"></a>  <span class="fu">return</span>(<span class="fu">list</span>(<span class="st">&quot;plt&quot;</span><span class="ot">=</span>plt_temp,<span class="st">&quot;d&quot;</span><span class="ot">=</span>d_temp))</span>
+<span id="cb44-60"><a href="rgb-classification.html#cb44-60" tabindex="-1"></a>}</span>
+<span id="cb44-61"><a href="rgb-classification.html#cb44-61" tabindex="-1"></a><span class="co"># combine 3</span></span>
+<span id="cb44-62"><a href="rgb-classification.html#cb44-62" tabindex="-1"></a>plt_combine_temp <span class="ot">&lt;-</span> <span class="cf">function</span>(</span>
+<span id="cb44-63"><a href="rgb-classification.html#cb44-63" tabindex="-1"></a>    rn</span>
+<span id="cb44-64"><a href="rgb-classification.html#cb44-64" tabindex="-1"></a>    , <span class="at">df =</span> slash_piles_polys <span class="sc">%&gt;%</span> dplyr<span class="sc">::</span><span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(comment))</span>
+<span id="cb44-65"><a href="rgb-classification.html#cb44-65" tabindex="-1"></a>    , <span class="at">composite_rast1 =</span> rodmanetal2019_panchromatic_rast<span class="sc">$</span>composite</span>
+<span id="cb44-66"><a href="rgb-classification.html#cb44-66" tabindex="-1"></a>    , <span class="at">title1 =</span> <span class="st">&quot;panchromatic composite&quot;</span></span>
+<span id="cb44-67"><a href="rgb-classification.html#cb44-67" tabindex="-1"></a>    , <span class="at">composite_rast2 =</span> rodmanetal2019_grvi_rast<span class="sc">$</span>composite</span>
+<span id="cb44-68"><a href="rgb-classification.html#cb44-68" tabindex="-1"></a>    , <span class="at">title2 =</span> <span class="st">&quot;GRVI composite&quot;</span></span>
+<span id="cb44-69"><a href="rgb-classification.html#cb44-69" tabindex="-1"></a>    , <span class="at">crs =</span> terra<span class="sc">::</span><span class="fu">crs</span>(ortho_rast)</span>
+<span id="cb44-70"><a href="rgb-classification.html#cb44-70" tabindex="-1"></a>) {</span>
+<span id="cb44-71"><a href="rgb-classification.html#cb44-71" tabindex="-1"></a>  <span class="co"># composite 1</span></span>
+<span id="cb44-72"><a href="rgb-classification.html#cb44-72" tabindex="-1"></a>  ans1 <span class="ot">&lt;-</span> <span class="fu">p_fn_temp</span>(</span>
+<span id="cb44-73"><a href="rgb-classification.html#cb44-73" tabindex="-1"></a>    <span class="at">rn =</span> rn</span>
+<span id="cb44-74"><a href="rgb-classification.html#cb44-74" tabindex="-1"></a>    , <span class="at">df =</span> df</span>
+<span id="cb44-75"><a href="rgb-classification.html#cb44-75" tabindex="-1"></a>    , <span class="at">composite_rast =</span> composite_rast1</span>
+<span id="cb44-76"><a href="rgb-classification.html#cb44-76" tabindex="-1"></a>    , <span class="at">my_title =</span> title1</span>
+<span id="cb44-77"><a href="rgb-classification.html#cb44-77" tabindex="-1"></a>    , <span class="at">crs =</span> crs</span>
+<span id="cb44-78"><a href="rgb-classification.html#cb44-78" tabindex="-1"></a>  )</span>
+<span id="cb44-79"><a href="rgb-classification.html#cb44-79" tabindex="-1"></a>  <span class="co"># composite 2</span></span>
+<span id="cb44-80"><a href="rgb-classification.html#cb44-80" tabindex="-1"></a>  ans2 <span class="ot">&lt;-</span> <span class="fu">p_fn_temp</span>(</span>
+<span id="cb44-81"><a href="rgb-classification.html#cb44-81" tabindex="-1"></a>    <span class="at">rn =</span> rn</span>
+<span id="cb44-82"><a href="rgb-classification.html#cb44-82" tabindex="-1"></a>    , <span class="at">df =</span> df</span>
+<span id="cb44-83"><a href="rgb-classification.html#cb44-83" tabindex="-1"></a>    , <span class="at">composite_rast =</span> composite_rast2</span>
+<span id="cb44-84"><a href="rgb-classification.html#cb44-84" tabindex="-1"></a>    , <span class="at">my_title =</span> title2</span>
+<span id="cb44-85"><a href="rgb-classification.html#cb44-85" tabindex="-1"></a>    , <span class="at">crs =</span> crs</span>
+<span id="cb44-86"><a href="rgb-classification.html#cb44-86" tabindex="-1"></a>  )</span>
+<span id="cb44-87"><a href="rgb-classification.html#cb44-87" tabindex="-1"></a>  <span class="co"># plt rgb</span></span>
+<span id="cb44-88"><a href="rgb-classification.html#cb44-88" tabindex="-1"></a>    rgb_temp <span class="ot">&lt;-</span></span>
+<span id="cb44-89"><a href="rgb-classification.html#cb44-89" tabindex="-1"></a>      <span class="fu">ortho_plt_fn</span>(ans1<span class="sc">$</span>d) <span class="sc">+</span> </span>
+<span id="cb44-90"><a href="rgb-classification.html#cb44-90" tabindex="-1"></a>      ggplot2<span class="sc">::</span><span class="fu">geom_sf</span>(<span class="at">data =</span> ans1<span class="sc">$</span>d, <span class="at">fill =</span> <span class="cn">NA</span>, <span class="at">color =</span> <span class="st">&quot;white&quot;</span>, <span class="at">lwd =</span> <span class="fl">0.3</span>)</span>
+<span id="cb44-91"><a href="rgb-classification.html#cb44-91" tabindex="-1"></a>  <span class="co"># combine</span></span>
+<span id="cb44-92"><a href="rgb-classification.html#cb44-92" tabindex="-1"></a>    r <span class="ot">&lt;-</span> ans1<span class="sc">$</span>plt <span class="sc">+</span> ans2<span class="sc">$</span>plt <span class="sc">+</span> rgb_temp</span>
+<span id="cb44-93"><a href="rgb-classification.html#cb44-93" tabindex="-1"></a>    <span class="fu">return</span>(r)</span>
+<span id="cb44-94"><a href="rgb-classification.html#cb44-94" tabindex="-1"></a>}</span>
+<span id="cb44-95"><a href="rgb-classification.html#cb44-95" tabindex="-1"></a></span>
+<span id="cb44-96"><a href="rgb-classification.html#cb44-96" tabindex="-1"></a><span class="co"># add pile locations</span></span>
+<span id="cb44-97"><a href="rgb-classification.html#cb44-97" tabindex="-1"></a>plt_list_grvi_comp <span class="ot">&lt;-</span> <span class="fu">sample</span>(<span class="dv">1</span><span class="sc">:</span><span class="fu">nrow</span>(slash_piles_polys <span class="sc">%&gt;%</span> dplyr<span class="sc">::</span><span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(comment))),<span class="dv">10</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb44-98"><a href="rgb-classification.html#cb44-98" tabindex="-1"></a>  purrr<span class="sc">::</span><span class="fu">map</span>(plt_combine_temp)</span>
+<span id="cb44-99"><a href="rgb-classification.html#cb44-99" tabindex="-1"></a><span class="co"># plt_list_grvi_comp[[2]]</span></span></code></pre></div>
+<p>combine the plots for a few piles</p>
+<div class="sourceCode" id="cb45"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb45-1"><a href="rgb-classification.html#cb45-1" tabindex="-1"></a>patchwork<span class="sc">::</span><span class="fu">wrap_plots</span>(</span>
+<span id="cb45-2"><a href="rgb-classification.html#cb45-2" tabindex="-1"></a>  plt_list_grvi_comp</span>
+<span id="cb45-3"><a href="rgb-classification.html#cb45-3" tabindex="-1"></a>  , <span class="at">ncol =</span> <span class="dv">1</span></span>
+<span id="cb45-4"><a href="rgb-classification.html#cb45-4" tabindex="-1"></a>)</span></code></pre></div>
+<p><img src="manitou_slash_piles_files/figure-html/unnamed-chunk-36-1.png" width="1008" /></p>
+<div class="sourceCode" id="cb46"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb46-1"><a href="rgb-classification.html#cb46-1" tabindex="-1"></a>ggplot2<span class="sc">::</span><span class="fu">ggsave</span>(<span class="st">&quot;../data/pile_tiles_texture.jpeg&quot;</span>, <span class="at">height =</span> <span class="fl">10.5</span>, <span class="at">width =</span> <span class="dv">5</span>)</span></code></pre></div>
+</div>
+</div>
+<div id="unsupervised-classification" class="section level2 hasAnchor" number="3.2">
+<h2><span class="header-section-number">3.2</span> Unsupervised classification<a href="rgb-classification.html#unsupervised-classification" class="anchor-section" aria-label="Anchor link to header"></a></h2>
+<p>Unsupervised image classification could be used to identify slash piles by grouping pixels with similar spectral characteristics. We’ll call any method that implements classification at the pixel level like the unsupervised classification approach tested here “pixel-based image analysis” versus to OBIA. Unsupervised image classification uses algorithms like K-means to find natural clusters within spectral data and can use other inputs like elevation or spectral indices. This method operates without requiring pre-defined training data, making it useful when field data is limited. The output assigns each pixel to a class, which the user then interprets to potentially identify slash piles based on their distinct spectral signatures and elevated height. While effective for initial classification and pattern recognition, unsupervised methods can produce numerous classes that require manual interpretation and may be less accurate than supervised approaches without ground truth data.</p>
+<p>let’s test it out and see what we get</p>
+<p>first, we’ll convert our rasters to a data frame</p>
+<div class="sourceCode" id="cb47"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb47-1"><a href="rgb-classification.html#cb47-1" tabindex="-1"></a><span class="co">#rename composites</span></span>
+<span id="cb47-2"><a href="rgb-classification.html#cb47-2" tabindex="-1"></a><span class="fu">names</span>(rodmanetal2019_panchromatic_rast<span class="sc">$</span>composite) <span class="ot">&lt;-</span> <span class="fu">c</span>(</span>
+<span id="cb47-3"><a href="rgb-classification.html#cb47-3" tabindex="-1"></a>  <span class="st">&quot;panchromatic&quot;</span>, <span class="st">&quot;panchromatic_local_sd&quot;</span>, <span class="st">&quot;panchromatic_local_minima&quot;</span></span>
+<span id="cb47-4"><a href="rgb-classification.html#cb47-4" tabindex="-1"></a>)</span>
+<span id="cb47-5"><a href="rgb-classification.html#cb47-5" tabindex="-1"></a><span class="fu">names</span>(rodmanetal2019_grvi_rast<span class="sc">$</span>composite) <span class="ot">&lt;-</span> <span class="fu">c</span>(</span>
+<span id="cb47-6"><a href="rgb-classification.html#cb47-6" tabindex="-1"></a>  <span class="st">&quot;grvi&quot;</span>, <span class="st">&quot;grvi_local_sd&quot;</span>, <span class="st">&quot;grvi_local_minima&quot;</span></span>
+<span id="cb47-7"><a href="rgb-classification.html#cb47-7" tabindex="-1"></a>)</span>
+<span id="cb47-8"><a href="rgb-classification.html#cb47-8" tabindex="-1"></a><span class="co"># raster stack</span></span>
+<span id="cb47-9"><a href="rgb-classification.html#cb47-9" tabindex="-1"></a>pred_rast <span class="ot">&lt;-</span> <span class="fu">c</span>(</span>
+<span id="cb47-10"><a href="rgb-classification.html#cb47-10" tabindex="-1"></a>  terra<span class="sc">::</span><span class="fu">subset</span>(ortho_rast, <span class="fu">c</span>(<span class="st">&quot;red&quot;</span>,<span class="st">&quot;green&quot;</span>,<span class="st">&quot;blue&quot;</span>))</span>
+<span id="cb47-11"><a href="rgb-classification.html#cb47-11" tabindex="-1"></a>  , rodmanetal2019_panchromatic_rast<span class="sc">$</span>composite</span>
+<span id="cb47-12"><a href="rgb-classification.html#cb47-12" tabindex="-1"></a>  , rodmanetal2019_grvi_rast<span class="sc">$</span>composite</span>
+<span id="cb47-13"><a href="rgb-classification.html#cb47-13" tabindex="-1"></a>)</span></code></pre></div>
+<p>check out correlations between covariates</p>
+<div class="sourceCode" id="cb48"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb48-1"><a href="rgb-classification.html#cb48-1" tabindex="-1"></a><span class="co"># investigate correlation among environmental covariates</span></span>
+<span id="cb48-2"><a href="rgb-classification.html#cb48-2" tabindex="-1"></a>pred_rast <span class="sc">%&gt;%</span> </span>
+<span id="cb48-3"><a href="rgb-classification.html#cb48-3" tabindex="-1"></a>  terra<span class="sc">::</span><span class="fu">pairs</span>(</span>
+<span id="cb48-4"><a href="rgb-classification.html#cb48-4" tabindex="-1"></a>    <span class="at">maxcells =</span> <span class="fu">min</span>(<span class="dv">7777</span>, terra<span class="sc">::</span><span class="fu">ncell</span>(pred_rast)<span class="sc">*</span>.<span class="dv">01</span>)</span>
+<span id="cb48-5"><a href="rgb-classification.html#cb48-5" tabindex="-1"></a>  )</span></code></pre></div>
+<p><img src="manitou_slash_piles_files/figure-html/unnamed-chunk-38-1.png" width="1008" /></p>
+<p>the panchromatic band itself doesn’t add much new information, let’s remove it and generate a data frame for training kmeans clustering</p>
+<div class="sourceCode" id="cb49"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb49-1"><a href="rgb-classification.html#cb49-1" tabindex="-1"></a><span class="co"># remove correlated layers</span></span>
+<span id="cb49-2"><a href="rgb-classification.html#cb49-2" tabindex="-1"></a>pred_rast <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">subset</span>(</span>
+<span id="cb49-3"><a href="rgb-classification.html#cb49-3" tabindex="-1"></a>  pred_rast</span>
+<span id="cb49-4"><a href="rgb-classification.html#cb49-4" tabindex="-1"></a>  , <span class="at">subset =</span> <span class="fu">c</span>(<span class="st">&quot;panchromatic&quot;</span>)</span>
+<span id="cb49-5"><a href="rgb-classification.html#cb49-5" tabindex="-1"></a>  , <span class="at">negate =</span> T</span>
+<span id="cb49-6"><a href="rgb-classification.html#cb49-6" tabindex="-1"></a>)</span>
+<span id="cb49-7"><a href="rgb-classification.html#cb49-7" tabindex="-1"></a><span class="co"># combine rasters as data frame</span></span>
+<span id="cb49-8"><a href="rgb-classification.html#cb49-8" tabindex="-1"></a>pred_df <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">as.data.frame</span>(</span>
+<span id="cb49-9"><a href="rgb-classification.html#cb49-9" tabindex="-1"></a>    pred_rast</span>
+<span id="cb49-10"><a href="rgb-classification.html#cb49-10" tabindex="-1"></a>    , <span class="at">xy =</span> T</span>
+<span id="cb49-11"><a href="rgb-classification.html#cb49-11" tabindex="-1"></a>    , <span class="at">cell =</span> T</span>
+<span id="cb49-12"><a href="rgb-classification.html#cb49-12" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span> </span>
+<span id="cb49-13"><a href="rgb-classification.html#cb49-13" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(</span>
+<span id="cb49-14"><a href="rgb-classification.html#cb49-14" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">across</span>(</span>
+<span id="cb49-15"><a href="rgb-classification.html#cb49-15" tabindex="-1"></a>      <span class="at">.cols =</span> <span class="fu">c</span>(red,green,blue)</span>
+<span id="cb49-16"><a href="rgb-classification.html#cb49-16" tabindex="-1"></a>      , <span class="at">.fns =</span> <span class="sc">~</span> <span class="fu">ifelse</span>(.x<span class="sc">==</span><span class="dv">0</span>,<span class="cn">NA</span>,.x)</span>
+<span id="cb49-17"><a href="rgb-classification.html#cb49-17" tabindex="-1"></a>    )</span>
+<span id="cb49-18"><a href="rgb-classification.html#cb49-18" tabindex="-1"></a>  )</span>
+<span id="cb49-19"><a href="rgb-classification.html#cb49-19" tabindex="-1"></a><span class="co"># what is this data?</span></span>
+<span id="cb49-20"><a href="rgb-classification.html#cb49-20" tabindex="-1"></a>pred_df <span class="sc">%&gt;%</span> dplyr<span class="sc">::</span><span class="fu">slice_sample</span>(<span class="at">n=</span><span class="dv">100</span>) <span class="sc">%&gt;%</span> dplyr<span class="sc">::</span><span class="fu">glimpse</span>()</span></code></pre></div>
+<pre><code>## Rows: 100
+## Columns: 11
+## $ cell                      &lt;dbl&gt; 1732458, 9273634, 1693316, 10236607, 6789055…
+## $ x                         &lt;dbl&gt; 499679.4, 499456.2, 499953.3, 499831.3, 4995…
+## $ y                         &lt;dbl&gt; 4318082, 4317834, 4318084, 4317802, 4317916,…
+## $ red                       &lt;dbl&gt; 97.70557, 31.03595, NA, 98.23176, 91.81036, …
+## $ green                     &lt;dbl&gt; 112.66428, 34.53605, NA, 100.26696, 96.95100…
+## $ blue                      &lt;dbl&gt; 64.07671, 39.03930, NA, 91.79925, 99.08756, …
+## $ panchromatic_local_sd     &lt;dbl&gt; 189.82342, 106.98445, NA, 228.27211, 288.939…
+## $ panchromatic_local_minima &lt;dbl&gt; 0, 0, NA, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0…
+## $ grvi                      &lt;dbl&gt; 0.071106755, 0.053377894, NA, 0.010252973, 0…
+## $ grvi_local_sd             &lt;dbl&gt; 0.14033654, 0.18129285, NA, 0.29922352, 0.17…
+## $ grvi_local_minima         &lt;dbl&gt; 0, 0, NA, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0…</code></pre>
+<p>perform kmeans clustering</p>
+<div class="sourceCode" id="cb51"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb51-1"><a href="rgb-classification.html#cb51-1" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">111</span>)</span>
+<span id="cb51-2"><a href="rgb-classification.html#cb51-2" tabindex="-1"></a><span class="co"># Create 6 clusters, allow 500 iterations, start with 5 random sets using &quot;Lloyd&quot;</span></span>
+<span id="cb51-3"><a href="rgb-classification.html#cb51-3" tabindex="-1"></a>kmncluster <span class="ot">&lt;-</span> stats<span class="sc">::</span><span class="fu">kmeans</span>(</span>
+<span id="cb51-4"><a href="rgb-classification.html#cb51-4" tabindex="-1"></a>  pred_df <span class="sc">%&gt;%</span> </span>
+<span id="cb51-5"><a href="rgb-classification.html#cb51-5" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span><span class="fu">c</span>(cell,x,y)) <span class="sc">%&gt;%</span> </span>
+<span id="cb51-6"><a href="rgb-classification.html#cb51-6" tabindex="-1"></a>    <span class="co"># we can&#39;t have NA values in kmeans</span></span>
+<span id="cb51-7"><a href="rgb-classification.html#cb51-7" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(</span>
+<span id="cb51-8"><a href="rgb-classification.html#cb51-8" tabindex="-1"></a>      dplyr<span class="sc">::</span><span class="fu">across</span>(</span>
+<span id="cb51-9"><a href="rgb-classification.html#cb51-9" tabindex="-1"></a>        <span class="at">.cols =</span> dplyr<span class="sc">::</span><span class="fu">everything</span>()</span>
+<span id="cb51-10"><a href="rgb-classification.html#cb51-10" tabindex="-1"></a>        , <span class="at">.fns =</span> <span class="sc">~</span> <span class="fu">as.numeric</span>(<span class="fu">ifelse</span>(<span class="fu">is.na</span>(.x),<span class="sc">-</span><span class="dv">99</span>,.x))</span>
+<span id="cb51-11"><a href="rgb-classification.html#cb51-11" tabindex="-1"></a>      )</span>
+<span id="cb51-12"><a href="rgb-classification.html#cb51-12" tabindex="-1"></a>    )</span>
+<span id="cb51-13"><a href="rgb-classification.html#cb51-13" tabindex="-1"></a>  , <span class="at">centers=</span><span class="dv">6</span></span>
+<span id="cb51-14"><a href="rgb-classification.html#cb51-14" tabindex="-1"></a>  , <span class="at">iter.max =</span> <span class="dv">500</span></span>
+<span id="cb51-15"><a href="rgb-classification.html#cb51-15" tabindex="-1"></a>  , <span class="at">nstart =</span> <span class="dv">5</span></span>
+<span id="cb51-16"><a href="rgb-classification.html#cb51-16" tabindex="-1"></a>  , <span class="at">algorithm=</span><span class="st">&quot;Lloyd&quot;</span></span>
+<span id="cb51-17"><a href="rgb-classification.html#cb51-17" tabindex="-1"></a>)</span>
+<span id="cb51-18"><a href="rgb-classification.html#cb51-18" tabindex="-1"></a><span class="co"># kmeans returns an object of class kmeans</span></span>
+<span id="cb51-19"><a href="rgb-classification.html#cb51-19" tabindex="-1"></a><span class="fu">str</span>(kmncluster)</span></code></pre></div>
+<pre><code>## List of 9
+##  $ cluster     : Named int [1:16236984] 4 4 4 4 4 4 4 4 4 4 ...
+##   ..- attr(*, &quot;names&quot;)= chr [1:16236984] &quot;1&quot; &quot;2&quot; &quot;3&quot; &quot;4&quot; ...
+##  $ centers     : num [1:6, 1:8] 165.8 29.7 110.6 -99 53.2 ...
+##   ..- attr(*, &quot;dimnames&quot;)=List of 2
+##   .. ..$ : chr [1:6] &quot;1&quot; &quot;2&quot; &quot;3&quot; &quot;4&quot; ...
+##   .. ..$ : chr [1:8] &quot;red&quot; &quot;green&quot; &quot;blue&quot; &quot;panchromatic_local_sd&quot; ...
+##  $ totss       : num 3.22e+11
+##  $ withinss    : num [1:6] 1.29e+10 6.39e+09 7.97e+09 4.91e+08 8.79e+09 ...
+##  $ tot.withinss: num 4.45e+10
+##  $ betweenss   : num 2.77e+11
+##  $ size        : int [1:6] 5327066 2385838 3892966 583431 2126720 1920963
+##  $ iter        : int 64
+##  $ ifault      : NULL
+##  - attr(*, &quot;class&quot;)= chr &quot;kmeans&quot;</code></pre>
+<p>put the kmeans clusters into a raster</p>
+<div class="sourceCode" id="cb53"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb53-1"><a href="rgb-classification.html#cb53-1" tabindex="-1"></a><span class="co"># make a blank raster</span></span>
+<span id="cb53-2"><a href="rgb-classification.html#cb53-2" tabindex="-1"></a>kmeans_cluster_rast <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">rast</span>(ortho_rast, <span class="at">nlyr=</span><span class="dv">1</span>)</span>
+<span id="cb53-3"><a href="rgb-classification.html#cb53-3" tabindex="-1"></a><span class="co"># fill the raster</span></span>
+<span id="cb53-4"><a href="rgb-classification.html#cb53-4" tabindex="-1"></a>kmeans_cluster_rast[pred_df<span class="sc">$</span>cell] <span class="ot">&lt;-</span> kmncluster<span class="sc">$</span>cluster</span>
+<span id="cb53-5"><a href="rgb-classification.html#cb53-5" tabindex="-1"></a><span class="co"># what?</span></span>
+<span id="cb53-6"><a href="rgb-classification.html#cb53-6" tabindex="-1"></a>kmeans_cluster_rast</span></code></pre></div>
+<pre><code>## class       : SpatRaster 
+## dimensions  : 3567, 4552, 1  (nrow, ncol, nlyr)
+## resolution  : 0.15, 0.15  (x, y)
+## extent      : 499274.8, 499957.6, 4317604, 4318139  (xmin, xmax, ymin, ymax)
+## coord. ref. : WGS 84 / UTM zone 13N (EPSG:32613) 
+## source(s)   : memory
+## name        : lyr1 
+## min value   :    1 
+## max value   :    6</code></pre>
+<p>there should be at most 6 clusters</p>
+<div class="sourceCode" id="cb55"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb55-1"><a href="rgb-classification.html#cb55-1" tabindex="-1"></a>terra<span class="sc">::</span><span class="fu">freq</span>(kmeans_cluster_rast)</span></code></pre></div>
+<pre><code>##   layer value   count
+## 1     1     1 5327066
+## 2     1     2 2385838
+## 3     1     3 3892966
+## 4     1     4  583431
+## 5     1     5 2126720
+## 6     1     6 1920963</code></pre>
+<p>plot the kmeans unsupervised classfication result</p>
+<div class="sourceCode" id="cb57"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb57-1"><a href="rgb-classification.html#cb57-1" tabindex="-1"></a>terra<span class="sc">::</span><span class="fu">plot</span>(</span>
+<span id="cb57-2"><a href="rgb-classification.html#cb57-2" tabindex="-1"></a>  kmeans_cluster_rast</span>
+<span id="cb57-3"><a href="rgb-classification.html#cb57-3" tabindex="-1"></a>  , <span class="at">col =</span> viridis<span class="sc">::</span><span class="fu">turbo</span>(<span class="at">n=</span><span class="dv">6</span>)</span>
+<span id="cb57-4"><a href="rgb-classification.html#cb57-4" tabindex="-1"></a>  , <span class="at">axes=</span>F, <span class="at">legend =</span> F</span>
+<span id="cb57-5"><a href="rgb-classification.html#cb57-5" tabindex="-1"></a>)</span>
+<span id="cb57-6"><a href="rgb-classification.html#cb57-6" tabindex="-1"></a><span class="co"># add polys</span></span>
+<span id="cb57-7"><a href="rgb-classification.html#cb57-7" tabindex="-1"></a>terra<span class="sc">::</span><span class="fu">plot</span>(</span>
+<span id="cb57-8"><a href="rgb-classification.html#cb57-8" tabindex="-1"></a>  slash_piles_polys <span class="sc">%&gt;%</span> sf<span class="sc">::</span><span class="fu">st_transform</span>(terra<span class="sc">::</span><span class="fu">crs</span>(grvi_rast)) <span class="sc">%&gt;%</span> terra<span class="sc">::</span><span class="fu">vect</span>()</span>
+<span id="cb57-9"><a href="rgb-classification.html#cb57-9" tabindex="-1"></a>  , <span class="at">add =</span> T, <span class="at">border =</span> <span class="st">&quot;white&quot;</span>, <span class="at">col =</span> <span class="cn">NA</span></span>
+<span id="cb57-10"><a href="rgb-classification.html#cb57-10" tabindex="-1"></a>)</span></code></pre></div>
+<p><img src="manitou_slash_piles_files/figure-html/unnamed-chunk-44-1.png" width="1008" /></p>
+<p>neat, let’s see if the piles are classified by making a custom function to plot the classified raster and RGB side-by-side</p>
+<div class="sourceCode" id="cb58"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb58-1"><a href="rgb-classification.html#cb58-1" tabindex="-1"></a>p_fn_temp <span class="ot">&lt;-</span> <span class="cf">function</span>(</span>
+<span id="cb58-2"><a href="rgb-classification.html#cb58-2" tabindex="-1"></a>    rn</span>
+<span id="cb58-3"><a href="rgb-classification.html#cb58-3" tabindex="-1"></a>    , <span class="at">df =</span> slash_piles_polys <span class="sc">%&gt;%</span> dplyr<span class="sc">::</span><span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(comment))</span>
+<span id="cb58-4"><a href="rgb-classification.html#cb58-4" tabindex="-1"></a>    , <span class="at">cluster_rast =</span> kmeans_cluster_rast</span>
+<span id="cb58-5"><a href="rgb-classification.html#cb58-5" tabindex="-1"></a>    , <span class="at">crs =</span> terra<span class="sc">::</span><span class="fu">crs</span>(ortho_rast)</span>
+<span id="cb58-6"><a href="rgb-classification.html#cb58-6" tabindex="-1"></a>) {</span>
+<span id="cb58-7"><a href="rgb-classification.html#cb58-7" tabindex="-1"></a>  <span class="co"># scale the buffer based on the largest</span></span>
+<span id="cb58-8"><a href="rgb-classification.html#cb58-8" tabindex="-1"></a>    d_temp <span class="ot">&lt;-</span> df <span class="sc">%&gt;%</span></span>
+<span id="cb58-9"><a href="rgb-classification.html#cb58-9" tabindex="-1"></a>      dplyr<span class="sc">::</span><span class="fu">arrange</span>(<span class="fu">tolower</span>(comment), <span class="fu">desc</span>(diameter)) <span class="sc">%&gt;%</span> </span>
+<span id="cb58-10"><a href="rgb-classification.html#cb58-10" tabindex="-1"></a>      dplyr<span class="sc">::</span><span class="fu">slice</span>(rn) <span class="sc">%&gt;%</span> </span>
+<span id="cb58-11"><a href="rgb-classification.html#cb58-11" tabindex="-1"></a>      sf<span class="sc">::</span><span class="fu">st_transform</span>(crs)</span>
+<span id="cb58-12"><a href="rgb-classification.html#cb58-12" tabindex="-1"></a>    <span class="co"># plt</span></span>
+<span id="cb58-13"><a href="rgb-classification.html#cb58-13" tabindex="-1"></a>    rgb_temp <span class="ot">&lt;-</span></span>
+<span id="cb58-14"><a href="rgb-classification.html#cb58-14" tabindex="-1"></a>      <span class="fu">ortho_plt_fn</span>(d_temp) <span class="sc">+</span> </span>
+<span id="cb58-15"><a href="rgb-classification.html#cb58-15" tabindex="-1"></a>      ggplot2<span class="sc">::</span><span class="fu">geom_sf</span>(<span class="at">data =</span> d_temp, <span class="at">fill =</span> <span class="cn">NA</span>, <span class="at">color =</span> <span class="st">&quot;white&quot;</span>, <span class="at">lwd =</span> <span class="dv">1</span>)</span>
+<span id="cb58-16"><a href="rgb-classification.html#cb58-16" tabindex="-1"></a>    </span>
+<span id="cb58-17"><a href="rgb-classification.html#cb58-17" tabindex="-1"></a>    <span class="co"># plt classifier</span></span>
+<span id="cb58-18"><a href="rgb-classification.html#cb58-18" tabindex="-1"></a>    class_temp <span class="ot">&lt;-</span> ggplot2<span class="sc">::</span><span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb58-19"><a href="rgb-classification.html#cb58-19" tabindex="-1"></a>      ggplot2<span class="sc">::</span><span class="fu">geom_tile</span>(</span>
+<span id="cb58-20"><a href="rgb-classification.html#cb58-20" tabindex="-1"></a>        <span class="at">data =</span> cluster_rast <span class="sc">%&gt;%</span>  </span>
+<span id="cb58-21"><a href="rgb-classification.html#cb58-21" tabindex="-1"></a>          terra<span class="sc">::</span><span class="fu">crop</span>(</span>
+<span id="cb58-22"><a href="rgb-classification.html#cb58-22" tabindex="-1"></a>            d_temp <span class="sc">%&gt;%</span> sf<span class="sc">::</span><span class="fu">st_buffer</span>(<span class="dv">20</span>) <span class="sc">%&gt;%</span> terra<span class="sc">::</span><span class="fu">vect</span>()</span>
+<span id="cb58-23"><a href="rgb-classification.html#cb58-23" tabindex="-1"></a>          ) <span class="sc">%&gt;%</span> </span>
+<span id="cb58-24"><a href="rgb-classification.html#cb58-24" tabindex="-1"></a>          terra<span class="sc">::</span><span class="fu">as.data.frame</span>(<span class="at">xy=</span>T) <span class="sc">%&gt;%</span> </span>
+<span id="cb58-25"><a href="rgb-classification.html#cb58-25" tabindex="-1"></a>          dplyr<span class="sc">::</span><span class="fu">rename</span>(<span class="at">f=</span><span class="dv">3</span>)</span>
+<span id="cb58-26"><a href="rgb-classification.html#cb58-26" tabindex="-1"></a>        , ggplot2<span class="sc">::</span><span class="fu">aes</span>(<span class="at">x=</span>x,<span class="at">y=</span>y,<span class="at">fill=</span><span class="fu">as.factor</span>(f))</span>
+<span id="cb58-27"><a href="rgb-classification.html#cb58-27" tabindex="-1"></a>      ) <span class="sc">+</span></span>
+<span id="cb58-28"><a href="rgb-classification.html#cb58-28" tabindex="-1"></a>      ggplot2<span class="sc">::</span><span class="fu">geom_sf</span>(<span class="at">data =</span> d_temp, <span class="at">fill =</span> <span class="cn">NA</span>, <span class="at">color =</span> <span class="st">&quot;white&quot;</span>, <span class="at">lwd =</span> <span class="dv">1</span>) <span class="sc">+</span></span>
+<span id="cb58-29"><a href="rgb-classification.html#cb58-29" tabindex="-1"></a>      ggplot2<span class="sc">::</span><span class="fu">scale_fill_manual</span>(</span>
+<span id="cb58-30"><a href="rgb-classification.html#cb58-30" tabindex="-1"></a>        <span class="at">values =</span> <span class="fu">c</span>(</span>
+<span id="cb58-31"><a href="rgb-classification.html#cb58-31" tabindex="-1"></a>          <span class="st">&quot;1&quot;</span> <span class="ot">=</span> viridis<span class="sc">::</span><span class="fu">turbo</span>(<span class="at">n=</span><span class="dv">6</span>)[<span class="dv">1</span>]</span>
+<span id="cb58-32"><a href="rgb-classification.html#cb58-32" tabindex="-1"></a>          , <span class="st">&quot;2&quot;</span> <span class="ot">=</span> viridis<span class="sc">::</span><span class="fu">turbo</span>(<span class="at">n=</span><span class="dv">6</span>)[<span class="dv">2</span>]</span>
+<span id="cb58-33"><a href="rgb-classification.html#cb58-33" tabindex="-1"></a>          , <span class="st">&quot;3&quot;</span> <span class="ot">=</span> viridis<span class="sc">::</span><span class="fu">turbo</span>(<span class="at">n=</span><span class="dv">6</span>)[<span class="dv">3</span>]</span>
+<span id="cb58-34"><a href="rgb-classification.html#cb58-34" tabindex="-1"></a>          , <span class="st">&quot;4&quot;</span> <span class="ot">=</span> viridis<span class="sc">::</span><span class="fu">turbo</span>(<span class="at">n=</span><span class="dv">6</span>)[<span class="dv">4</span>]</span>
+<span id="cb58-35"><a href="rgb-classification.html#cb58-35" tabindex="-1"></a>          , <span class="st">&quot;5&quot;</span> <span class="ot">=</span> viridis<span class="sc">::</span><span class="fu">turbo</span>(<span class="at">n=</span><span class="dv">6</span>)[<span class="dv">5</span>]</span>
+<span id="cb58-36"><a href="rgb-classification.html#cb58-36" tabindex="-1"></a>          , <span class="st">&quot;6&quot;</span> <span class="ot">=</span> viridis<span class="sc">::</span><span class="fu">turbo</span>(<span class="at">n=</span><span class="dv">6</span>)[<span class="dv">6</span>]</span>
+<span id="cb58-37"><a href="rgb-classification.html#cb58-37" tabindex="-1"></a>          <span class="co"># , &quot;7&quot; = viridis::turbo(n=10)[7]</span></span>
+<span id="cb58-38"><a href="rgb-classification.html#cb58-38" tabindex="-1"></a>          <span class="co"># , &quot;8&quot; = viridis::turbo(n=10)[8]</span></span>
+<span id="cb58-39"><a href="rgb-classification.html#cb58-39" tabindex="-1"></a>          <span class="co"># , &quot;9&quot; = viridis::turbo(n=10)[9]</span></span>
+<span id="cb58-40"><a href="rgb-classification.html#cb58-40" tabindex="-1"></a>          <span class="co"># , &quot;10&quot; = viridis::turbo(n=10)[10]</span></span>
+<span id="cb58-41"><a href="rgb-classification.html#cb58-41" tabindex="-1"></a>        )</span>
+<span id="cb58-42"><a href="rgb-classification.html#cb58-42" tabindex="-1"></a>        , <span class="at">na.value =</span> <span class="st">&quot;transparent&quot;</span></span>
+<span id="cb58-43"><a href="rgb-classification.html#cb58-43" tabindex="-1"></a>      ) <span class="sc">+</span></span>
+<span id="cb58-44"><a href="rgb-classification.html#cb58-44" tabindex="-1"></a>      ggplot2<span class="sc">::</span><span class="fu">scale_x_continuous</span>(<span class="at">expand =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="dv">0</span>)) <span class="sc">+</span></span>
+<span id="cb58-45"><a href="rgb-classification.html#cb58-45" tabindex="-1"></a>      ggplot2<span class="sc">::</span><span class="fu">scale_y_continuous</span>(<span class="at">expand =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="dv">0</span>)) <span class="sc">+</span></span>
+<span id="cb58-46"><a href="rgb-classification.html#cb58-46" tabindex="-1"></a>      ggplot2<span class="sc">::</span><span class="fu">labs</span>(</span>
+<span id="cb58-47"><a href="rgb-classification.html#cb58-47" tabindex="-1"></a>        <span class="at">x =</span> <span class="st">&quot;&quot;</span></span>
+<span id="cb58-48"><a href="rgb-classification.html#cb58-48" tabindex="-1"></a>        , <span class="at">y =</span> <span class="st">&quot;&quot;</span></span>
+<span id="cb58-49"><a href="rgb-classification.html#cb58-49" tabindex="-1"></a>        , <span class="at">fill =</span> <span class="st">&quot;&quot;</span></span>
+<span id="cb58-50"><a href="rgb-classification.html#cb58-50" tabindex="-1"></a>      ) <span class="sc">+</span></span>
+<span id="cb58-51"><a href="rgb-classification.html#cb58-51" tabindex="-1"></a>      ggplot2<span class="sc">::</span><span class="fu">theme_void</span>() <span class="sc">+</span> </span>
+<span id="cb58-52"><a href="rgb-classification.html#cb58-52" tabindex="-1"></a>      ggplot2<span class="sc">::</span><span class="fu">theme</span>(</span>
+<span id="cb58-53"><a href="rgb-classification.html#cb58-53" tabindex="-1"></a>        <span class="at">legend.position =</span> <span class="st">&quot;left&quot;</span> <span class="co"># c(0.5,1)</span></span>
+<span id="cb58-54"><a href="rgb-classification.html#cb58-54" tabindex="-1"></a>        , <span class="at">legend.margin =</span> <span class="fu">margin</span>(<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">0</span>,<span class="dv">0</span>)</span>
+<span id="cb58-55"><a href="rgb-classification.html#cb58-55" tabindex="-1"></a>        , <span class="at">legend.text =</span> <span class="fu">element_text</span>(<span class="at">size =</span> <span class="dv">6</span>)</span>
+<span id="cb58-56"><a href="rgb-classification.html#cb58-56" tabindex="-1"></a>        , <span class="at">legend.title =</span> <span class="fu">element_text</span>(<span class="at">size =</span> <span class="dv">6</span>)</span>
+<span id="cb58-57"><a href="rgb-classification.html#cb58-57" tabindex="-1"></a>        , <span class="at">legend.key =</span> <span class="fu">element_rect</span>(<span class="at">fill =</span> <span class="st">&quot;white&quot;</span>)</span>
+<span id="cb58-58"><a href="rgb-classification.html#cb58-58" tabindex="-1"></a>        <span class="co"># , plot.title = ggtext::element_markdown(size = 10, hjust = 0.5)</span></span>
+<span id="cb58-59"><a href="rgb-classification.html#cb58-59" tabindex="-1"></a>        , <span class="at">plot.title =</span> <span class="fu">element_text</span>(<span class="at">size =</span> <span class="dv">8</span>, <span class="at">hjust =</span> <span class="fl">0.5</span>, <span class="at">face =</span> <span class="st">&quot;bold&quot;</span>)</span>
+<span id="cb58-60"><a href="rgb-classification.html#cb58-60" tabindex="-1"></a>        , <span class="at">plot.subtitle =</span> <span class="fu">element_text</span>(<span class="at">size =</span> <span class="dv">6</span>, <span class="at">hjust =</span> <span class="fl">0.5</span>, <span class="at">face =</span> <span class="st">&quot;italic&quot;</span>)</span>
+<span id="cb58-61"><a href="rgb-classification.html#cb58-61" tabindex="-1"></a>      )</span>
+<span id="cb58-62"><a href="rgb-classification.html#cb58-62" tabindex="-1"></a>  plt_temp <span class="ot">&lt;-</span> class_temp<span class="sc">+</span>rgb_temp</span>
+<span id="cb58-63"><a href="rgb-classification.html#cb58-63" tabindex="-1"></a>  <span class="fu">return</span>(plt_temp)</span>
+<span id="cb58-64"><a href="rgb-classification.html#cb58-64" tabindex="-1"></a>}</span>
+<span id="cb58-65"><a href="rgb-classification.html#cb58-65" tabindex="-1"></a><span class="co"># add pile locations</span></span>
+<span id="cb58-66"><a href="rgb-classification.html#cb58-66" tabindex="-1"></a>plt_list_kmeans <span class="ot">&lt;-</span> <span class="fu">sample</span>(<span class="dv">1</span><span class="sc">:</span><span class="fu">nrow</span>(slash_piles_polys <span class="sc">%&gt;%</span> dplyr<span class="sc">::</span><span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(comment))),<span class="dv">10</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb58-67"><a href="rgb-classification.html#cb58-67" tabindex="-1"></a>  purrr<span class="sc">::</span><span class="fu">map</span>(p_fn_temp)</span></code></pre></div>
+<p>combine the plots for a few piles</p>
+<div class="sourceCode" id="cb59"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb59-1"><a href="rgb-classification.html#cb59-1" tabindex="-1"></a>patchwork<span class="sc">::</span><span class="fu">wrap_plots</span>(</span>
+<span id="cb59-2"><a href="rgb-classification.html#cb59-2" tabindex="-1"></a>  plt_list_kmeans</span>
+<span id="cb59-3"><a href="rgb-classification.html#cb59-3" tabindex="-1"></a>  , <span class="at">ncol =</span> <span class="dv">2</span></span>
+<span id="cb59-4"><a href="rgb-classification.html#cb59-4" tabindex="-1"></a>  , <span class="at">guides =</span> <span class="st">&quot;collect&quot;</span></span>
+<span id="cb59-5"><a href="rgb-classification.html#cb59-5" tabindex="-1"></a>)</span></code></pre></div>
+<p><img src="manitou_slash_piles_files/figure-html/unnamed-chunk-47-1.png" width="1008" /></p>
+<div class="sourceCode" id="cb60"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb60-1"><a href="rgb-classification.html#cb60-1" tabindex="-1"></a>ggplot2<span class="sc">::</span><span class="fu">ggsave</span>(<span class="st">&quot;../data/pile_tiles_kmeans6.jpeg&quot;</span>, <span class="at">height =</span> <span class="fl">10.5</span>, <span class="at">width =</span> <span class="dv">8</span>)</span></code></pre></div>
+<p>there is no discernible pattern between the kmeans classes and the slash piles because the lighting and conditions around the piles are not consistent. this result also highlights the challenges we’ll likely face with pixel-based classification methods</p>
+</div>
+<div id="supervised-classification" class="section level2 hasAnchor" number="3.3">
+<h2><span class="header-section-number">3.3</span> Supervised classification<a href="rgb-classification.html#supervised-classification" class="anchor-section" aria-label="Anchor link to header"></a></h2>
+<p>we’ll start with a pixel-based classification using the image-annotated pile polygons to train a classification model</p>
+<p>first, let’s set aside some piles for use in validation</p>
+<div class="sourceCode" id="cb61"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb61-1"><a href="rgb-classification.html#cb61-1" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">333</span>)</span>
+<span id="cb61-2"><a href="rgb-classification.html#cb61-2" tabindex="-1"></a><span class="co"># 20% will be used for validation</span></span>
+<span id="cb61-3"><a href="rgb-classification.html#cb61-3" tabindex="-1"></a>slash_piles_polys <span class="ot">&lt;-</span> slash_piles_polys <span class="sc">%&gt;%</span> </span>
+<span id="cb61-4"><a href="rgb-classification.html#cb61-4" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">left_join</span>(</span>
+<span id="cb61-5"><a href="rgb-classification.html#cb61-5" tabindex="-1"></a>    slash_piles_polys <span class="sc">%&gt;%</span> </span>
+<span id="cb61-6"><a href="rgb-classification.html#cb61-6" tabindex="-1"></a>      sf<span class="sc">::</span><span class="fu">st_drop_geometry</span>() <span class="sc">%&gt;%</span> </span>
+<span id="cb61-7"><a href="rgb-classification.html#cb61-7" tabindex="-1"></a>      dplyr<span class="sc">::</span><span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(comment)) <span class="sc">%&gt;%</span> </span>
+<span id="cb61-8"><a href="rgb-classification.html#cb61-8" tabindex="-1"></a>      dplyr<span class="sc">::</span><span class="fu">distinct</span>(pile_id) <span class="sc">%&gt;%</span></span>
+<span id="cb61-9"><a href="rgb-classification.html#cb61-9" tabindex="-1"></a>      dplyr<span class="sc">::</span><span class="fu">slice_sample</span>(<span class="at">prop =</span> <span class="fl">0.2</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb61-10"><a href="rgb-classification.html#cb61-10" tabindex="-1"></a>      dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">is_training =</span> F)</span>
+<span id="cb61-11"><a href="rgb-classification.html#cb61-11" tabindex="-1"></a>    , <span class="at">by =</span> <span class="st">&quot;pile_id&quot;</span></span>
+<span id="cb61-12"><a href="rgb-classification.html#cb61-12" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span> </span>
+<span id="cb61-13"><a href="rgb-classification.html#cb61-13" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">is_training =</span> dplyr<span class="sc">::</span><span class="fu">coalesce</span>(is_training, T))</span>
+<span id="cb61-14"><a href="rgb-classification.html#cb61-14" tabindex="-1"></a>slash_piles_points <span class="ot">&lt;-</span> slash_piles_points <span class="sc">%&gt;%</span> </span>
+<span id="cb61-15"><a href="rgb-classification.html#cb61-15" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">left_join</span>(</span>
+<span id="cb61-16"><a href="rgb-classification.html#cb61-16" tabindex="-1"></a>    slash_piles_polys <span class="sc">%&gt;%</span> </span>
+<span id="cb61-17"><a href="rgb-classification.html#cb61-17" tabindex="-1"></a>      sf<span class="sc">::</span><span class="fu">st_drop_geometry</span>() <span class="sc">%&gt;%</span> </span>
+<span id="cb61-18"><a href="rgb-classification.html#cb61-18" tabindex="-1"></a>      dplyr<span class="sc">::</span><span class="fu">distinct</span>(objectid, is_training)</span>
+<span id="cb61-19"><a href="rgb-classification.html#cb61-19" tabindex="-1"></a>    , <span class="at">by =</span> <span class="st">&quot;objectid&quot;</span></span>
+<span id="cb61-20"><a href="rgb-classification.html#cb61-20" tabindex="-1"></a>  )</span>
+<span id="cb61-21"><a href="rgb-classification.html#cb61-21" tabindex="-1"></a><span class="co"># slash_piles_points %&gt;% sf::st_drop_geometry() %&gt;% dplyr::count(is_training)</span></span></code></pre></div>
+<p>first, we’ll generate a set of sample points to extract raster values from to build our training data with covariates</p>
+<div class="sourceCode" id="cb62"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb62-1"><a href="rgb-classification.html#cb62-1" tabindex="-1"></a>training_points <span class="ot">&lt;-</span> dplyr<span class="sc">::</span><span class="fu">bind_rows</span>(</span>
+<span id="cb62-2"><a href="rgb-classification.html#cb62-2" tabindex="-1"></a><span class="co"># sample only from non-pile parts of the raster</span></span>
+<span id="cb62-3"><a href="rgb-classification.html#cb62-3" tabindex="-1"></a>  terra<span class="sc">::</span><span class="fu">mask</span>(</span>
+<span id="cb62-4"><a href="rgb-classification.html#cb62-4" tabindex="-1"></a>    grvi_rast</span>
+<span id="cb62-5"><a href="rgb-classification.html#cb62-5" tabindex="-1"></a>    , slash_piles_polys <span class="sc">%&gt;%</span> <span class="co"># use ALL piles (image-annotated and field-collected)</span></span>
+<span id="cb62-6"><a href="rgb-classification.html#cb62-6" tabindex="-1"></a>        sf<span class="sc">::</span><span class="fu">st_transform</span>(terra<span class="sc">::</span><span class="fu">crs</span>(grvi_rast)) <span class="sc">%&gt;%</span> </span>
+<span id="cb62-7"><a href="rgb-classification.html#cb62-7" tabindex="-1"></a>        terra<span class="sc">::</span><span class="fu">vect</span>()</span>
+<span id="cb62-8"><a href="rgb-classification.html#cb62-8" tabindex="-1"></a>    , <span class="at">inverse =</span> T</span>
+<span id="cb62-9"><a href="rgb-classification.html#cb62-9" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
+<span id="cb62-10"><a href="rgb-classification.html#cb62-10" tabindex="-1"></a>  terra<span class="sc">::</span><span class="fu">spatSample</span>(<span class="at">size =</span> <span class="dv">5000</span>, <span class="at">na.rm =</span> T, <span class="at">xy =</span> T) <span class="sc">%&gt;%</span> </span>
+<span id="cb62-11"><a href="rgb-classification.html#cb62-11" tabindex="-1"></a>  sf<span class="sc">::</span><span class="fu">st_as_sf</span>(<span class="at">coords =</span> <span class="fu">c</span>(<span class="st">&quot;x&quot;</span>, <span class="st">&quot;y&quot;</span>), <span class="at">crs =</span> terra<span class="sc">::</span><span class="fu">crs</span>(grvi_rast)) <span class="sc">%&gt;%</span> </span>
+<span id="cb62-12"><a href="rgb-classification.html#cb62-12" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(</span>
+<span id="cb62-13"><a href="rgb-classification.html#cb62-13" tabindex="-1"></a>    <span class="at">is_pile =</span> <span class="dv">0</span></span>
+<span id="cb62-14"><a href="rgb-classification.html#cb62-14" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span> </span>
+<span id="cb62-15"><a href="rgb-classification.html#cb62-15" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(is_pile)</span>
+<span id="cb62-16"><a href="rgb-classification.html#cb62-16" tabindex="-1"></a><span class="co"># sample points within piles</span></span>
+<span id="cb62-17"><a href="rgb-classification.html#cb62-17" tabindex="-1"></a>  , slash_piles_polys <span class="sc">%&gt;%</span> </span>
+<span id="cb62-18"><a href="rgb-classification.html#cb62-18" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">filter</span>(</span>
+<span id="cb62-19"><a href="rgb-classification.html#cb62-19" tabindex="-1"></a>      is_training</span>
+<span id="cb62-20"><a href="rgb-classification.html#cb62-20" tabindex="-1"></a>    ) <span class="sc">%&gt;%</span> </span>
+<span id="cb62-21"><a href="rgb-classification.html#cb62-21" tabindex="-1"></a>    sf<span class="sc">::</span><span class="fu">st_transform</span>(terra<span class="sc">::</span><span class="fu">crs</span>(grvi_rast)) <span class="sc">%&gt;%</span> </span>
+<span id="cb62-22"><a href="rgb-classification.html#cb62-22" tabindex="-1"></a>    terra<span class="sc">::</span><span class="fu">vect</span>() <span class="sc">%&gt;%</span> </span>
+<span id="cb62-23"><a href="rgb-classification.html#cb62-23" tabindex="-1"></a>    terra<span class="sc">::</span><span class="fu">spatSample</span>(<span class="at">size =</span> <span class="dv">1000</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb62-24"><a href="rgb-classification.html#cb62-24" tabindex="-1"></a>    sf<span class="sc">::</span><span class="fu">st_as_sf</span>() <span class="sc">%&gt;%</span> </span>
+<span id="cb62-25"><a href="rgb-classification.html#cb62-25" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(</span>
+<span id="cb62-26"><a href="rgb-classification.html#cb62-26" tabindex="-1"></a>      <span class="at">is_pile =</span> <span class="dv">1</span></span>
+<span id="cb62-27"><a href="rgb-classification.html#cb62-27" tabindex="-1"></a>    ) <span class="sc">%&gt;%</span> </span>
+<span id="cb62-28"><a href="rgb-classification.html#cb62-28" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">select</span>(is_pile)</span>
+<span id="cb62-29"><a href="rgb-classification.html#cb62-29" tabindex="-1"></a>) <span class="sc">%&gt;%</span> </span>
+<span id="cb62-30"><a href="rgb-classification.html#cb62-30" tabindex="-1"></a>dplyr<span class="sc">::</span><span class="fu">mutate</span>(</span>
+<span id="cb62-31"><a href="rgb-classification.html#cb62-31" tabindex="-1"></a>  <span class="at">id =</span> dplyr<span class="sc">::</span><span class="fu">row_number</span>()</span>
+<span id="cb62-32"><a href="rgb-classification.html#cb62-32" tabindex="-1"></a>  , <span class="at">is_pile =</span> <span class="fu">as.factor</span>(is_pile)</span>
+<span id="cb62-33"><a href="rgb-classification.html#cb62-33" tabindex="-1"></a>  , <span class="at">x =</span> sf<span class="sc">::</span><span class="fu">st_coordinates</span>(.)[,<span class="dv">1</span>]</span>
+<span id="cb62-34"><a href="rgb-classification.html#cb62-34" tabindex="-1"></a>  , <span class="at">y =</span> sf<span class="sc">::</span><span class="fu">st_coordinates</span>(.)[,<span class="dv">2</span>]</span>
+<span id="cb62-35"><a href="rgb-classification.html#cb62-35" tabindex="-1"></a>)</span>
+<span id="cb62-36"><a href="rgb-classification.html#cb62-36" tabindex="-1"></a><span class="do">####### validation points since we&#39;ll validate at the pixel level</span></span>
+<span id="cb62-37"><a href="rgb-classification.html#cb62-37" tabindex="-1"></a>validation_points <span class="ot">&lt;-</span> dplyr<span class="sc">::</span><span class="fu">bind_rows</span>(</span>
+<span id="cb62-38"><a href="rgb-classification.html#cb62-38" tabindex="-1"></a><span class="co"># sample only from non-pile parts of the raster</span></span>
+<span id="cb62-39"><a href="rgb-classification.html#cb62-39" tabindex="-1"></a>  terra<span class="sc">::</span><span class="fu">mask</span>(</span>
+<span id="cb62-40"><a href="rgb-classification.html#cb62-40" tabindex="-1"></a>    grvi_rast</span>
+<span id="cb62-41"><a href="rgb-classification.html#cb62-41" tabindex="-1"></a>    , slash_piles_polys <span class="sc">%&gt;%</span> <span class="co"># use ALL piles (image-annotated and field-collected)</span></span>
+<span id="cb62-42"><a href="rgb-classification.html#cb62-42" tabindex="-1"></a>        sf<span class="sc">::</span><span class="fu">st_transform</span>(terra<span class="sc">::</span><span class="fu">crs</span>(grvi_rast)) <span class="sc">%&gt;%</span> </span>
+<span id="cb62-43"><a href="rgb-classification.html#cb62-43" tabindex="-1"></a>        terra<span class="sc">::</span><span class="fu">vect</span>()</span>
+<span id="cb62-44"><a href="rgb-classification.html#cb62-44" tabindex="-1"></a>    , <span class="at">inverse =</span> T</span>
+<span id="cb62-45"><a href="rgb-classification.html#cb62-45" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
+<span id="cb62-46"><a href="rgb-classification.html#cb62-46" tabindex="-1"></a>  <span class="co"># mask the training points as well</span></span>
+<span id="cb62-47"><a href="rgb-classification.html#cb62-47" tabindex="-1"></a>  terra<span class="sc">::</span><span class="fu">mask</span>(</span>
+<span id="cb62-48"><a href="rgb-classification.html#cb62-48" tabindex="-1"></a>    training_points <span class="sc">%&gt;%</span> terra<span class="sc">::</span><span class="fu">vect</span>()</span>
+<span id="cb62-49"><a href="rgb-classification.html#cb62-49" tabindex="-1"></a>    , <span class="at">inverse =</span> T</span>
+<span id="cb62-50"><a href="rgb-classification.html#cb62-50" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span> </span>
+<span id="cb62-51"><a href="rgb-classification.html#cb62-51" tabindex="-1"></a>  terra<span class="sc">::</span><span class="fu">spatSample</span>(<span class="at">size =</span> <span class="dv">5000</span>, <span class="at">na.rm =</span> T, <span class="at">xy =</span> T) <span class="sc">%&gt;%</span> </span>
+<span id="cb62-52"><a href="rgb-classification.html#cb62-52" tabindex="-1"></a>  sf<span class="sc">::</span><span class="fu">st_as_sf</span>(<span class="at">coords =</span> <span class="fu">c</span>(<span class="st">&quot;x&quot;</span>, <span class="st">&quot;y&quot;</span>), <span class="at">crs =</span> terra<span class="sc">::</span><span class="fu">crs</span>(grvi_rast)) <span class="sc">%&gt;%</span> </span>
+<span id="cb62-53"><a href="rgb-classification.html#cb62-53" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(</span>
+<span id="cb62-54"><a href="rgb-classification.html#cb62-54" tabindex="-1"></a>    <span class="at">is_pile =</span> <span class="dv">0</span></span>
+<span id="cb62-55"><a href="rgb-classification.html#cb62-55" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span> </span>
+<span id="cb62-56"><a href="rgb-classification.html#cb62-56" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(is_pile)</span>
+<span id="cb62-57"><a href="rgb-classification.html#cb62-57" tabindex="-1"></a><span class="co"># sample points within piles</span></span>
+<span id="cb62-58"><a href="rgb-classification.html#cb62-58" tabindex="-1"></a>  , slash_piles_polys <span class="sc">%&gt;%</span> </span>
+<span id="cb62-59"><a href="rgb-classification.html#cb62-59" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">filter</span>(</span>
+<span id="cb62-60"><a href="rgb-classification.html#cb62-60" tabindex="-1"></a>      <span class="sc">!</span>is_training</span>
+<span id="cb62-61"><a href="rgb-classification.html#cb62-61" tabindex="-1"></a>    ) <span class="sc">%&gt;%</span> </span>
+<span id="cb62-62"><a href="rgb-classification.html#cb62-62" tabindex="-1"></a>    sf<span class="sc">::</span><span class="fu">st_transform</span>(terra<span class="sc">::</span><span class="fu">crs</span>(grvi_rast)) <span class="sc">%&gt;%</span> </span>
+<span id="cb62-63"><a href="rgb-classification.html#cb62-63" tabindex="-1"></a>    terra<span class="sc">::</span><span class="fu">vect</span>() <span class="sc">%&gt;%</span> </span>
+<span id="cb62-64"><a href="rgb-classification.html#cb62-64" tabindex="-1"></a>    terra<span class="sc">::</span><span class="fu">spatSample</span>(<span class="at">size =</span> <span class="dv">1000</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb62-65"><a href="rgb-classification.html#cb62-65" tabindex="-1"></a>    sf<span class="sc">::</span><span class="fu">st_as_sf</span>() <span class="sc">%&gt;%</span> </span>
+<span id="cb62-66"><a href="rgb-classification.html#cb62-66" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(</span>
+<span id="cb62-67"><a href="rgb-classification.html#cb62-67" tabindex="-1"></a>      <span class="at">is_pile =</span> <span class="dv">1</span></span>
+<span id="cb62-68"><a href="rgb-classification.html#cb62-68" tabindex="-1"></a>    ) <span class="sc">%&gt;%</span> </span>
+<span id="cb62-69"><a href="rgb-classification.html#cb62-69" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">select</span>(is_pile)</span>
+<span id="cb62-70"><a href="rgb-classification.html#cb62-70" tabindex="-1"></a>) <span class="sc">%&gt;%</span> </span>
+<span id="cb62-71"><a href="rgb-classification.html#cb62-71" tabindex="-1"></a>dplyr<span class="sc">::</span><span class="fu">mutate</span>(</span>
+<span id="cb62-72"><a href="rgb-classification.html#cb62-72" tabindex="-1"></a>  <span class="at">id =</span> dplyr<span class="sc">::</span><span class="fu">row_number</span>()</span>
+<span id="cb62-73"><a href="rgb-classification.html#cb62-73" tabindex="-1"></a>  , <span class="at">is_pile =</span> <span class="fu">as.factor</span>(is_pile)</span>
+<span id="cb62-74"><a href="rgb-classification.html#cb62-74" tabindex="-1"></a>  , <span class="at">x =</span> sf<span class="sc">::</span><span class="fu">st_coordinates</span>(.)[,<span class="dv">1</span>]</span>
+<span id="cb62-75"><a href="rgb-classification.html#cb62-75" tabindex="-1"></a>  , <span class="at">y =</span> sf<span class="sc">::</span><span class="fu">st_coordinates</span>(.)[,<span class="dv">2</span>]</span>
+<span id="cb62-76"><a href="rgb-classification.html#cb62-76" tabindex="-1"></a>)</span></code></pre></div>
+<p>plot our RGB with training piles (white), validation piles(black), pile sample points (red), and non-pile sample points (blue)</p>
+<div class="sourceCode" id="cb63"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb63-1"><a href="rgb-classification.html#cb63-1" tabindex="-1"></a><span class="co"># let&#39;s check this out</span></span>
+<span id="cb63-2"><a href="rgb-classification.html#cb63-2" tabindex="-1"></a>terra<span class="sc">::</span><span class="fu">plotRGB</span>(ortho_rast, <span class="at">stretch =</span> <span class="st">&quot;lin&quot;</span>, <span class="at">colNA =</span> <span class="st">&quot;transparent&quot;</span>)</span>
+<span id="cb63-3"><a href="rgb-classification.html#cb63-3" tabindex="-1"></a>terra<span class="sc">::</span><span class="fu">plot</span>(</span>
+<span id="cb63-4"><a href="rgb-classification.html#cb63-4" tabindex="-1"></a>  slash_piles_polys <span class="sc">%&gt;%</span> </span>
+<span id="cb63-5"><a href="rgb-classification.html#cb63-5" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">filter</span>(is_training) <span class="sc">%&gt;%</span> </span>
+<span id="cb63-6"><a href="rgb-classification.html#cb63-6" tabindex="-1"></a>    sf<span class="sc">::</span><span class="fu">st_transform</span>(terra<span class="sc">::</span><span class="fu">crs</span>(ortho_rast)) <span class="sc">%&gt;%</span> terra<span class="sc">::</span><span class="fu">vect</span>()</span>
+<span id="cb63-7"><a href="rgb-classification.html#cb63-7" tabindex="-1"></a>  , <span class="at">add =</span> T, <span class="at">border =</span> <span class="st">&quot;white&quot;</span>, <span class="at">col =</span> <span class="cn">NA</span>, <span class="at">lwd =</span> <span class="fl">1.2</span></span>
+<span id="cb63-8"><a href="rgb-classification.html#cb63-8" tabindex="-1"></a>)</span>
+<span id="cb63-9"><a href="rgb-classification.html#cb63-9" tabindex="-1"></a>terra<span class="sc">::</span><span class="fu">plot</span>(</span>
+<span id="cb63-10"><a href="rgb-classification.html#cb63-10" tabindex="-1"></a>  slash_piles_polys <span class="sc">%&gt;%</span> </span>
+<span id="cb63-11"><a href="rgb-classification.html#cb63-11" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">filter</span>(<span class="sc">!</span>is_training) <span class="sc">%&gt;%</span> </span>
+<span id="cb63-12"><a href="rgb-classification.html#cb63-12" tabindex="-1"></a>    sf<span class="sc">::</span><span class="fu">st_transform</span>(terra<span class="sc">::</span><span class="fu">crs</span>(ortho_rast)) <span class="sc">%&gt;%</span> terra<span class="sc">::</span><span class="fu">vect</span>()</span>
+<span id="cb63-13"><a href="rgb-classification.html#cb63-13" tabindex="-1"></a>  , <span class="at">add =</span> T, <span class="at">border =</span> <span class="st">&quot;black&quot;</span>, <span class="at">col =</span> <span class="cn">NA</span>, <span class="at">lwd =</span> <span class="fl">1.2</span></span>
+<span id="cb63-14"><a href="rgb-classification.html#cb63-14" tabindex="-1"></a>)</span>
+<span id="cb63-15"><a href="rgb-classification.html#cb63-15" tabindex="-1"></a>terra<span class="sc">::</span><span class="fu">plot</span>(training_points <span class="sc">%&gt;%</span> dplyr<span class="sc">::</span><span class="fu">filter</span>(is_pile<span class="sc">==</span><span class="dv">1</span>) <span class="sc">%&gt;%</span> terra<span class="sc">::</span><span class="fu">vect</span>(), <span class="at">col =</span> <span class="st">&quot;red&quot;</span>, <span class="at">cex =</span> <span class="fl">0.5</span>, <span class="at">add =</span> T)</span>
+<span id="cb63-16"><a href="rgb-classification.html#cb63-16" tabindex="-1"></a>terra<span class="sc">::</span><span class="fu">plot</span>(training_points <span class="sc">%&gt;%</span> dplyr<span class="sc">::</span><span class="fu">filter</span>(is_pile<span class="sc">==</span><span class="dv">0</span>) <span class="sc">%&gt;%</span> terra<span class="sc">::</span><span class="fu">vect</span>(), <span class="at">col =</span> <span class="st">&quot;blue&quot;</span>, <span class="at">cex =</span> <span class="fl">0.5</span>, <span class="at">add =</span> T)</span></code></pre></div>
+<p><img src="manitou_slash_piles_files/figure-html/unnamed-chunk-50-1.png" width="1008" /></p>
+<p>extract the raster cell values from each layer in our RGB-based raster data, these values will be the predictor variables</p>
+<div class="sourceCode" id="cb64"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb64-1"><a href="rgb-classification.html#cb64-1" tabindex="-1"></a><span class="do">#############################</span></span>
+<span id="cb64-2"><a href="rgb-classification.html#cb64-2" tabindex="-1"></a><span class="co">#extract covariate data at point locations</span></span>
+<span id="cb64-3"><a href="rgb-classification.html#cb64-3" tabindex="-1"></a><span class="do">#############################</span></span>
+<span id="cb64-4"><a href="rgb-classification.html#cb64-4" tabindex="-1"></a>training_dta <span class="ot">&lt;-</span></span>
+<span id="cb64-5"><a href="rgb-classification.html#cb64-5" tabindex="-1"></a>  terra<span class="sc">::</span><span class="fu">extract</span>(</span>
+<span id="cb64-6"><a href="rgb-classification.html#cb64-6" tabindex="-1"></a>    pred_rast</span>
+<span id="cb64-7"><a href="rgb-classification.html#cb64-7" tabindex="-1"></a>    , training_points <span class="sc">%&gt;%</span>  </span>
+<span id="cb64-8"><a href="rgb-classification.html#cb64-8" tabindex="-1"></a>      terra<span class="sc">::</span><span class="fu">vect</span>()</span>
+<span id="cb64-9"><a href="rgb-classification.html#cb64-9" tabindex="-1"></a>    , <span class="at">ID =</span> F</span>
+<span id="cb64-10"><a href="rgb-classification.html#cb64-10" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span>  </span>
+<span id="cb64-11"><a href="rgb-classification.html#cb64-11" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">bind_cols</span>(</span>
+<span id="cb64-12"><a href="rgb-classification.html#cb64-12" tabindex="-1"></a>    training_points <span class="sc">%&gt;%</span>  </span>
+<span id="cb64-13"><a href="rgb-classification.html#cb64-13" tabindex="-1"></a>      dplyr<span class="sc">::</span><span class="fu">select</span>(id,is_pile,x,y)</span>
+<span id="cb64-14"><a href="rgb-classification.html#cb64-14" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span>  </span>
+<span id="cb64-15"><a href="rgb-classification.html#cb64-15" tabindex="-1"></a>  <span class="do">## make sure no data is missing</span></span>
+<span id="cb64-16"><a href="rgb-classification.html#cb64-16" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(dplyr<span class="sc">::</span><span class="fu">if_all</span>(dplyr<span class="sc">::</span><span class="fu">everything</span>(), <span class="sc">~</span> <span class="sc">!</span><span class="fu">is.na</span>(.x)))</span>
+<span id="cb64-17"><a href="rgb-classification.html#cb64-17" tabindex="-1"></a>  <span class="co"># ## square continuous vars?</span></span>
+<span id="cb64-18"><a href="rgb-classification.html#cb64-18" tabindex="-1"></a>  <span class="co"># dplyr::mutate(dplyr::across(</span></span>
+<span id="cb64-19"><a href="rgb-classification.html#cb64-19" tabindex="-1"></a>  <span class="co">#   .cols = dplyr::where(is.numeric) &amp; !c(id, is_pile, x, y) &amp; !tidyselect::ends_with(&quot;local_minima&quot;)</span></span>
+<span id="cb64-20"><a href="rgb-classification.html#cb64-20" tabindex="-1"></a>  <span class="co">#   , .fns = list(sq)</span></span>
+<span id="cb64-21"><a href="rgb-classification.html#cb64-21" tabindex="-1"></a>  <span class="co">#   , .names = &quot;{.col}_sq&quot; </span></span>
+<span id="cb64-22"><a href="rgb-classification.html#cb64-22" tabindex="-1"></a>  <span class="co"># ))</span></span>
+<span id="cb64-23"><a href="rgb-classification.html#cb64-23" tabindex="-1"></a><span class="do">##### and validation data to perform accuracy assesment at the pixel level</span></span>
+<span id="cb64-24"><a href="rgb-classification.html#cb64-24" tabindex="-1"></a>validation_dta <span class="ot">&lt;-</span></span>
+<span id="cb64-25"><a href="rgb-classification.html#cb64-25" tabindex="-1"></a>  terra<span class="sc">::</span><span class="fu">extract</span>(</span>
+<span id="cb64-26"><a href="rgb-classification.html#cb64-26" tabindex="-1"></a>    pred_rast</span>
+<span id="cb64-27"><a href="rgb-classification.html#cb64-27" tabindex="-1"></a>    , validation_points <span class="sc">%&gt;%</span>  </span>
+<span id="cb64-28"><a href="rgb-classification.html#cb64-28" tabindex="-1"></a>      terra<span class="sc">::</span><span class="fu">vect</span>()</span>
+<span id="cb64-29"><a href="rgb-classification.html#cb64-29" tabindex="-1"></a>    , <span class="at">ID =</span> F</span>
+<span id="cb64-30"><a href="rgb-classification.html#cb64-30" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span>  </span>
+<span id="cb64-31"><a href="rgb-classification.html#cb64-31" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">bind_cols</span>(</span>
+<span id="cb64-32"><a href="rgb-classification.html#cb64-32" tabindex="-1"></a>    validation_points <span class="sc">%&gt;%</span>  </span>
+<span id="cb64-33"><a href="rgb-classification.html#cb64-33" tabindex="-1"></a>      dplyr<span class="sc">::</span><span class="fu">select</span>(id,is_pile,x,y)</span>
+<span id="cb64-34"><a href="rgb-classification.html#cb64-34" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span>  </span>
+<span id="cb64-35"><a href="rgb-classification.html#cb64-35" tabindex="-1"></a>  <span class="do">## make sure no data is missing</span></span>
+<span id="cb64-36"><a href="rgb-classification.html#cb64-36" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(dplyr<span class="sc">::</span><span class="fu">if_all</span>(dplyr<span class="sc">::</span><span class="fu">everything</span>(), <span class="sc">~</span> <span class="sc">!</span><span class="fu">is.na</span>(.x)))</span>
+<span id="cb64-37"><a href="rgb-classification.html#cb64-37" tabindex="-1"></a>  <span class="co"># ## square continuous vars?</span></span>
+<span id="cb64-38"><a href="rgb-classification.html#cb64-38" tabindex="-1"></a>  <span class="co"># dplyr::mutate(dplyr::across(</span></span>
+<span id="cb64-39"><a href="rgb-classification.html#cb64-39" tabindex="-1"></a>  <span class="co">#   .cols = dplyr::where(is.numeric) &amp; !c(id, is_pile, x, y) &amp; !tidyselect::ends_with(&quot;local_minima&quot;)</span></span>
+<span id="cb64-40"><a href="rgb-classification.html#cb64-40" tabindex="-1"></a>  <span class="co">#   , .fns = list(sq)</span></span>
+<span id="cb64-41"><a href="rgb-classification.html#cb64-41" tabindex="-1"></a>  <span class="co">#   , .names = &quot;{.col}_sq&quot; </span></span>
+<span id="cb64-42"><a href="rgb-classification.html#cb64-42" tabindex="-1"></a>  <span class="co"># ))</span></span></code></pre></div>
+<p>compare training and validation data to ensure that they are similar (i.e. we drew a big enough sample)</p>
+<div class="sourceCode" id="cb65"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb65-1"><a href="rgb-classification.html#cb65-1" tabindex="-1"></a>dplyr<span class="sc">::</span><span class="fu">bind_rows</span>(</span>
+<span id="cb65-2"><a href="rgb-classification.html#cb65-2" tabindex="-1"></a>    training_dta <span class="sc">%&gt;%</span> sf<span class="sc">::</span><span class="fu">st_drop_geometry</span>() <span class="sc">%&gt;%</span> dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">dta_set =</span> <span class="st">&quot;Training&quot;</span>)</span>
+<span id="cb65-3"><a href="rgb-classification.html#cb65-3" tabindex="-1"></a>    , validation_dta <span class="sc">%&gt;%</span> sf<span class="sc">::</span><span class="fu">st_drop_geometry</span>() <span class="sc">%&gt;%</span> dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">dta_set =</span> <span class="st">&quot;Validation&quot;</span>)</span>
+<span id="cb65-4"><a href="rgb-classification.html#cb65-4" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span> </span>
+<span id="cb65-5"><a href="rgb-classification.html#cb65-5" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span><span class="fu">c</span>(geometry,dplyr<span class="sc">::</span><span class="fu">ends_with</span>(<span class="st">&quot;_sq&quot;</span>))) <span class="sc">%&gt;%</span> </span>
+<span id="cb65-6"><a href="rgb-classification.html#cb65-6" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate_if</span>(is.factor, as.numeric) <span class="sc">%&gt;%</span> </span>
+<span id="cb65-7"><a href="rgb-classification.html#cb65-7" tabindex="-1"></a>  tidyr<span class="sc">::</span><span class="fu">pivot_longer</span>(</span>
+<span id="cb65-8"><a href="rgb-classification.html#cb65-8" tabindex="-1"></a>    <span class="at">cols =</span> <span class="sc">-</span><span class="fu">c</span>(id, is_pile, dta_set)</span>
+<span id="cb65-9"><a href="rgb-classification.html#cb65-9" tabindex="-1"></a>    , <span class="at">names_to =</span> <span class="st">&quot;covariate&quot;</span></span>
+<span id="cb65-10"><a href="rgb-classification.html#cb65-10" tabindex="-1"></a>    , <span class="at">values_to =</span> <span class="st">&quot;value&quot;</span></span>
+<span id="cb65-11"><a href="rgb-classification.html#cb65-11" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span> </span>
+<span id="cb65-12"><a href="rgb-classification.html#cb65-12" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">covariate =</span> stringr<span class="sc">::</span><span class="fu">str_replace_all</span>(covariate,<span class="st">&quot;_&quot;</span>, <span class="st">&quot; &quot;</span>)) <span class="sc">%&gt;%</span> </span>
+<span id="cb65-13"><a href="rgb-classification.html#cb65-13" tabindex="-1"></a><span class="fu">ggplot</span>(<span class="at">mapping =</span> <span class="fu">aes</span>(<span class="at">x =</span> value, <span class="at">color =</span> dta_set, <span class="at">fill =</span> dta_set, <span class="at">group =</span> dta_set)) <span class="sc">+</span></span>
+<span id="cb65-14"><a href="rgb-classification.html#cb65-14" tabindex="-1"></a>  <span class="fu">geom_density</span>(<span class="at">alpha=</span><span class="fl">0.6</span>) <span class="sc">+</span></span>
+<span id="cb65-15"><a href="rgb-classification.html#cb65-15" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(</span>
+<span id="cb65-16"><a href="rgb-classification.html#cb65-16" tabindex="-1"></a>    <span class="at">facets =</span> <span class="fu">vars</span>(covariate), <span class="at">scales =</span> <span class="st">&quot;free&quot;</span></span>
+<span id="cb65-17"><a href="rgb-classification.html#cb65-17" tabindex="-1"></a>    , <span class="at">labeller =</span> <span class="fu">label_wrap_gen</span>(<span class="at">width =</span> <span class="dv">25</span>, <span class="at">multi_line =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb65-18"><a href="rgb-classification.html#cb65-18" tabindex="-1"></a>  ) <span class="sc">+</span> </span>
+<span id="cb65-19"><a href="rgb-classification.html#cb65-19" tabindex="-1"></a>  <span class="fu">scale_color_viridis_d</span>(<span class="at">option =</span> <span class="st">&quot;cividis&quot;</span>) <span class="sc">+</span></span>
+<span id="cb65-20"><a href="rgb-classification.html#cb65-20" tabindex="-1"></a>  <span class="fu">scale_fill_viridis_d</span>(<span class="at">option =</span> <span class="st">&quot;cividis&quot;</span>) <span class="sc">+</span></span>
+<span id="cb65-21"><a href="rgb-classification.html#cb65-21" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb65-22"><a href="rgb-classification.html#cb65-22" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">&quot;Distribution of Model Covariates&quot;</span></span>
+<span id="cb65-23"><a href="rgb-classification.html#cb65-23" tabindex="-1"></a>    , <span class="at">subtitle =</span> <span class="fu">paste0</span>(</span>
+<span id="cb65-24"><a href="rgb-classification.html#cb65-24" tabindex="-1"></a>      <span class="st">&quot;by Training (n=&quot;</span></span>
+<span id="cb65-25"><a href="rgb-classification.html#cb65-25" tabindex="-1"></a>      , <span class="fu">nrow</span>(training_dta) <span class="sc">%&gt;%</span> scales<span class="sc">::</span><span class="fu">comma</span>(<span class="at">accuracy =</span> <span class="dv">1</span>)</span>
+<span id="cb65-26"><a href="rgb-classification.html#cb65-26" tabindex="-1"></a>      , <span class="st">&quot;) and Validation (n=&quot;</span></span>
+<span id="cb65-27"><a href="rgb-classification.html#cb65-27" tabindex="-1"></a>      , <span class="fu">nrow</span>(validation_dta) <span class="sc">%&gt;%</span> scales<span class="sc">::</span><span class="fu">comma</span>(<span class="at">accuracy =</span> <span class="dv">1</span>)</span>
+<span id="cb65-28"><a href="rgb-classification.html#cb65-28" tabindex="-1"></a>      , <span class="st">&quot;) data&quot;</span></span>
+<span id="cb65-29"><a href="rgb-classification.html#cb65-29" tabindex="-1"></a>    )</span>
+<span id="cb65-30"><a href="rgb-classification.html#cb65-30" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb65-31"><a href="rgb-classification.html#cb65-31" tabindex="-1"></a>  <span class="fu">theme_light</span>() <span class="sc">+</span> </span>
+<span id="cb65-32"><a href="rgb-classification.html#cb65-32" tabindex="-1"></a>  <span class="fu">theme</span>(</span>
+<span id="cb65-33"><a href="rgb-classification.html#cb65-33" tabindex="-1"></a>    <span class="at">legend.position =</span> <span class="st">&quot;top&quot;</span></span>
+<span id="cb65-34"><a href="rgb-classification.html#cb65-34" tabindex="-1"></a>    , <span class="at">legend.title =</span> <span class="fu">element_blank</span>()</span>
+<span id="cb65-35"><a href="rgb-classification.html#cb65-35" tabindex="-1"></a>    , <span class="at">plot.title =</span> <span class="fu">element_text</span>(<span class="at">size =</span> <span class="dv">10</span>)</span>
+<span id="cb65-36"><a href="rgb-classification.html#cb65-36" tabindex="-1"></a>    , <span class="at">plot.subtitle =</span> <span class="fu">element_text</span>(<span class="at">size =</span> <span class="dv">9</span>)</span>
+<span id="cb65-37"><a href="rgb-classification.html#cb65-37" tabindex="-1"></a>    , <span class="at">axis.title =</span> <span class="fu">element_text</span>(<span class="at">size =</span> <span class="dv">7</span>)</span>
+<span id="cb65-38"><a href="rgb-classification.html#cb65-38" tabindex="-1"></a>    , <span class="at">axis.text =</span> <span class="fu">element_text</span>(<span class="at">size =</span> <span class="dv">6</span>)</span>
+<span id="cb65-39"><a href="rgb-classification.html#cb65-39" tabindex="-1"></a>  ) <span class="sc">+</span> </span>
+<span id="cb65-40"><a href="rgb-classification.html#cb65-40" tabindex="-1"></a>  <span class="fu">guides</span>(<span class="at">color =</span> <span class="fu">guide_legend</span>(<span class="at">override.aes =</span> <span class="fu">list</span>(<span class="at">size =</span> <span class="dv">5</span>)))</span></code></pre></div>
+<p><img src="manitou_slash_piles_files/figure-html/unnamed-chunk-52-1.png" width="1008" /></p>
+<p>we’ll use a random forest model to predict raster values</p>
+<div class="sourceCode" id="cb66"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb66-1"><a href="rgb-classification.html#cb66-1" tabindex="-1"></a><span class="co"># Tune on the full data if below threshold</span></span>
+<span id="cb66-2"><a href="rgb-classification.html#cb66-2" tabindex="-1"></a>tune_result_temp <span class="ot">&lt;-</span> randomForest<span class="sc">::</span><span class="fu">tuneRF</span>(</span>
+<span id="cb66-3"><a href="rgb-classification.html#cb66-3" tabindex="-1"></a>  <span class="at">y =</span> training_dta<span class="sc">$</span>is_pile</span>
+<span id="cb66-4"><a href="rgb-classification.html#cb66-4" tabindex="-1"></a>  , <span class="at">x =</span> training_dta <span class="sc">%&gt;%</span> sf<span class="sc">::</span><span class="fu">st_drop_geometry</span>() <span class="sc">%&gt;%</span> dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span><span class="fu">c</span>(id,is_pile,geometry))</span>
+<span id="cb66-5"><a href="rgb-classification.html#cb66-5" tabindex="-1"></a>  , <span class="at">ntreeTry =</span> <span class="dv">500</span></span>
+<span id="cb66-6"><a href="rgb-classification.html#cb66-6" tabindex="-1"></a>  , <span class="at">stepFactor =</span> <span class="dv">1</span></span>
+<span id="cb66-7"><a href="rgb-classification.html#cb66-7" tabindex="-1"></a>  , <span class="at">improve =</span> <span class="fl">0.03</span></span>
+<span id="cb66-8"><a href="rgb-classification.html#cb66-8" tabindex="-1"></a>  , <span class="at">plot =</span> F</span>
+<span id="cb66-9"><a href="rgb-classification.html#cb66-9" tabindex="-1"></a>  , <span class="at">trace =</span> F</span>
+<span id="cb66-10"><a href="rgb-classification.html#cb66-10" tabindex="-1"></a>)</span>
+<span id="cb66-11"><a href="rgb-classification.html#cb66-11" tabindex="-1"></a><span class="co"># Extract the optimal mtry value</span></span>
+<span id="cb66-12"><a href="rgb-classification.html#cb66-12" tabindex="-1"></a>optimal_mtry_temp <span class="ot">&lt;-</span> tune_result_temp <span class="sc">%&gt;%</span></span>
+<span id="cb66-13"><a href="rgb-classification.html#cb66-13" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">as_tibble</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb66-14"><a href="rgb-classification.html#cb66-14" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(OOBError<span class="sc">==</span><span class="fu">min</span>(OOBError)) <span class="sc">%&gt;%</span></span>
+<span id="cb66-15"><a href="rgb-classification.html#cb66-15" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(dplyr<span class="sc">::</span><span class="fu">row_number</span>() <span class="sc">==</span> <span class="dv">1</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb66-16"><a href="rgb-classification.html#cb66-16" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">pull</span>(mtry) <span class="sc">%&gt;%</span></span>
+<span id="cb66-17"><a href="rgb-classification.html#cb66-17" tabindex="-1"></a>  <span class="fu">as.numeric</span>()</span>
+<span id="cb66-18"><a href="rgb-classification.html#cb66-18" tabindex="-1"></a><span class="co"># pass to random forest model</span></span>
+<span id="cb66-19"><a href="rgb-classification.html#cb66-19" tabindex="-1"></a>mod_rf <span class="ot">&lt;-</span> randomForest<span class="sc">::</span><span class="fu">randomForest</span>(</span>
+<span id="cb66-20"><a href="rgb-classification.html#cb66-20" tabindex="-1"></a>  <span class="at">y =</span> training_dta<span class="sc">$</span>is_pile</span>
+<span id="cb66-21"><a href="rgb-classification.html#cb66-21" tabindex="-1"></a>  , <span class="at">x =</span> training_dta <span class="sc">%&gt;%</span> sf<span class="sc">::</span><span class="fu">st_drop_geometry</span>() <span class="sc">%&gt;%</span> dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span><span class="fu">c</span>(id,is_pile,geometry))</span>
+<span id="cb66-22"><a href="rgb-classification.html#cb66-22" tabindex="-1"></a>  , <span class="at">mtry =</span> optimal_mtry_temp</span>
+<span id="cb66-23"><a href="rgb-classification.html#cb66-23" tabindex="-1"></a>  , <span class="at">na.action =</span> na.omit</span>
+<span id="cb66-24"><a href="rgb-classification.html#cb66-24" tabindex="-1"></a>  , <span class="at">ntree =</span> <span class="dv">500</span></span>
+<span id="cb66-25"><a href="rgb-classification.html#cb66-25" tabindex="-1"></a>)</span></code></pre></div>
+<p>random forest variable importance plot</p>
+<div class="sourceCode" id="cb67"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb67-1"><a href="rgb-classification.html#cb67-1" tabindex="-1"></a><span class="co">#variable importance plot</span></span>
+<span id="cb67-2"><a href="rgb-classification.html#cb67-2" tabindex="-1"></a>randomForest<span class="sc">::</span><span class="fu">varImpPlot</span>(mod_rf)</span></code></pre></div>
+<p><img src="manitou_slash_piles_files/figure-html/unnamed-chunk-54-1.png" width="1008" /></p>
+<p>predict raster values</p>
+<div class="sourceCode" id="cb68"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb68-1"><a href="rgb-classification.html#cb68-1" tabindex="-1"></a><span class="co"># x,y rasters</span></span>
+<span id="cb68-2"><a href="rgb-classification.html#cb68-2" tabindex="-1"></a>y_rast_temp <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">init</span>(pred_rast[[<span class="dv">1</span>]], <span class="st">&quot;y&quot;</span>)</span>
+<span id="cb68-3"><a href="rgb-classification.html#cb68-3" tabindex="-1"></a><span class="fu">names</span>(y_rast_temp) <span class="ot">&lt;-</span> <span class="st">&quot;y&quot;</span></span>
+<span id="cb68-4"><a href="rgb-classification.html#cb68-4" tabindex="-1"></a>x_rast_temp <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">init</span>(pred_rast[[<span class="dv">1</span>]], <span class="st">&quot;x&quot;</span>)</span>
+<span id="cb68-5"><a href="rgb-classification.html#cb68-5" tabindex="-1"></a><span class="fu">names</span>(x_rast_temp) <span class="ot">&lt;-</span> <span class="st">&quot;x&quot;</span></span>
+<span id="cb68-6"><a href="rgb-classification.html#cb68-6" tabindex="-1"></a><span class="co"># predict</span></span>
+<span id="cb68-7"><a href="rgb-classification.html#cb68-7" tabindex="-1"></a>rf_pred_rast <span class="ot">&lt;-</span> terra<span class="sc">::</span><span class="fu">predict</span>(</span>
+<span id="cb68-8"><a href="rgb-classification.html#cb68-8" tabindex="-1"></a>  <span class="at">object =</span> <span class="fu">c</span>(</span>
+<span id="cb68-9"><a href="rgb-classification.html#cb68-9" tabindex="-1"></a>      pred_rast</span>
+<span id="cb68-10"><a href="rgb-classification.html#cb68-10" tabindex="-1"></a>      , x_rast_temp, y_rast_temp</span>
+<span id="cb68-11"><a href="rgb-classification.html#cb68-11" tabindex="-1"></a>    )</span>
+<span id="cb68-12"><a href="rgb-classification.html#cb68-12" tabindex="-1"></a>  , <span class="at">model =</span> mod_rf</span>
+<span id="cb68-13"><a href="rgb-classification.html#cb68-13" tabindex="-1"></a>  , <span class="at">na.rm =</span> T</span>
+<span id="cb68-14"><a href="rgb-classification.html#cb68-14" tabindex="-1"></a>  <span class="co"># , type = &quot;prob&quot;</span></span>
+<span id="cb68-15"><a href="rgb-classification.html#cb68-15" tabindex="-1"></a>)</span>
+<span id="cb68-16"><a href="rgb-classification.html#cb68-16" tabindex="-1"></a>terra<span class="sc">::</span><span class="fu">coltab</span>(rf_pred_rast) <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">value=</span><span class="dv">1</span><span class="sc">:</span><span class="dv">2</span>, <span class="at">col=</span><span class="fu">c</span>(<span class="st">&quot;gray&quot;</span>, <span class="st">&quot;khaki&quot;</span>))</span>
+<span id="cb68-17"><a href="rgb-classification.html#cb68-17" tabindex="-1"></a><span class="fu">levels</span>(rf_pred_rast) <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">value=</span><span class="dv">1</span><span class="sc">:</span><span class="dv">2</span>, <span class="at">col=</span><span class="fu">c</span>(<span class="st">&quot;non-pile&quot;</span>, <span class="st">&quot;pile&quot;</span>))</span></code></pre></div>
+<p>plot pixel-level predictions</p>
+<div class="sourceCode" id="cb69"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb69-1"><a href="rgb-classification.html#cb69-1" tabindex="-1"></a><span class="co">#plot</span></span>
+<span id="cb69-2"><a href="rgb-classification.html#cb69-2" tabindex="-1"></a>terra<span class="sc">::</span><span class="fu">plot</span>(rf_pred_rast)</span>
+<span id="cb69-3"><a href="rgb-classification.html#cb69-3" tabindex="-1"></a>terra<span class="sc">::</span><span class="fu">plot</span>(</span>
+<span id="cb69-4"><a href="rgb-classification.html#cb69-4" tabindex="-1"></a>  slash_piles_polys <span class="sc">%&gt;%</span> </span>
+<span id="cb69-5"><a href="rgb-classification.html#cb69-5" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">filter</span>(is_training) <span class="sc">%&gt;%</span> </span>
+<span id="cb69-6"><a href="rgb-classification.html#cb69-6" tabindex="-1"></a>    sf<span class="sc">::</span><span class="fu">st_transform</span>(terra<span class="sc">::</span><span class="fu">crs</span>(ortho_rast)) <span class="sc">%&gt;%</span> terra<span class="sc">::</span><span class="fu">vect</span>()</span>
+<span id="cb69-7"><a href="rgb-classification.html#cb69-7" tabindex="-1"></a>  , <span class="at">add =</span> T, <span class="at">border =</span> <span class="st">&quot;white&quot;</span>, <span class="at">col =</span> <span class="cn">NA</span>, <span class="at">lwd =</span> <span class="fl">1.2</span></span>
+<span id="cb69-8"><a href="rgb-classification.html#cb69-8" tabindex="-1"></a>)</span>
+<span id="cb69-9"><a href="rgb-classification.html#cb69-9" tabindex="-1"></a>terra<span class="sc">::</span><span class="fu">plot</span>(</span>
+<span id="cb69-10"><a href="rgb-classification.html#cb69-10" tabindex="-1"></a>  slash_piles_polys <span class="sc">%&gt;%</span> </span>
+<span id="cb69-11"><a href="rgb-classification.html#cb69-11" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">filter</span>(<span class="sc">!</span>is_training) <span class="sc">%&gt;%</span> </span>
+<span id="cb69-12"><a href="rgb-classification.html#cb69-12" tabindex="-1"></a>    sf<span class="sc">::</span><span class="fu">st_transform</span>(terra<span class="sc">::</span><span class="fu">crs</span>(ortho_rast)) <span class="sc">%&gt;%</span> terra<span class="sc">::</span><span class="fu">vect</span>()</span>
+<span id="cb69-13"><a href="rgb-classification.html#cb69-13" tabindex="-1"></a>  , <span class="at">add =</span> T, <span class="at">border =</span> <span class="st">&quot;black&quot;</span>, <span class="at">col =</span> <span class="cn">NA</span>, <span class="at">lwd =</span> <span class="fl">1.2</span></span>
+<span id="cb69-14"><a href="rgb-classification.html#cb69-14" tabindex="-1"></a>)</span></code></pre></div>
+<p><img src="manitou_slash_piles_files/figure-html/unnamed-chunk-57-1.png" width="1008" /></p>
+<p>evaluate model performance based on the Area under the Receiver Operating Characteristic (ROC) Curve (AUC) criterion (an AUC value of 0.5 can be interpreted as the model performing no better than a random prediction). Higher AUC values indicate that the model is better at predicting “absence” classes as “absence” (true negative) and “presence” classes as “presence” (true positive).</p>
+<div class="sourceCode" id="cb70"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb70-1"><a href="rgb-classification.html#cb70-1" tabindex="-1"></a>validation_dta <span class="ot">&lt;-</span></span>
+<span id="cb70-2"><a href="rgb-classification.html#cb70-2" tabindex="-1"></a>  validation_dta <span class="sc">%&gt;%</span> </span>
+<span id="cb70-3"><a href="rgb-classification.html#cb70-3" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">bind_cols</span>(</span>
+<span id="cb70-4"><a href="rgb-classification.html#cb70-4" tabindex="-1"></a>    terra<span class="sc">::</span><span class="fu">extract</span>(</span>
+<span id="cb70-5"><a href="rgb-classification.html#cb70-5" tabindex="-1"></a>      rf_pred_rast</span>
+<span id="cb70-6"><a href="rgb-classification.html#cb70-6" tabindex="-1"></a>      , validation_points <span class="sc">%&gt;%</span> terra<span class="sc">::</span><span class="fu">vect</span>()</span>
+<span id="cb70-7"><a href="rgb-classification.html#cb70-7" tabindex="-1"></a>      , <span class="at">ID =</span> F</span>
+<span id="cb70-8"><a href="rgb-classification.html#cb70-8" tabindex="-1"></a>    ) <span class="sc">%&gt;%</span> </span>
+<span id="cb70-9"><a href="rgb-classification.html#cb70-9" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">rename</span>(<span class="at">is_pile_predicted=</span><span class="dv">1</span>)</span>
+<span id="cb70-10"><a href="rgb-classification.html#cb70-10" tabindex="-1"></a>  )</span>
+<span id="cb70-11"><a href="rgb-classification.html#cb70-11" tabindex="-1"></a></span>
+<span id="cb70-12"><a href="rgb-classification.html#cb70-12" tabindex="-1"></a>PresenceAbsence<span class="sc">::</span><span class="fu">auc.roc.plot</span>(</span>
+<span id="cb70-13"><a href="rgb-classification.html#cb70-13" tabindex="-1"></a>  validation_dta <span class="sc">%&gt;%</span> </span>
+<span id="cb70-14"><a href="rgb-classification.html#cb70-14" tabindex="-1"></a>    sf<span class="sc">::</span><span class="fu">st_drop_geometry</span>() <span class="sc">%&gt;%</span> </span>
+<span id="cb70-15"><a href="rgb-classification.html#cb70-15" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">select</span>(id, is_pile, is_pile_predicted) <span class="sc">%&gt;%</span> </span>
+<span id="cb70-16"><a href="rgb-classification.html#cb70-16" tabindex="-1"></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(dplyr<span class="sc">::</span><span class="fu">across</span>(tidyselect<span class="sc">::</span><span class="fu">starts_with</span>(<span class="st">&quot;is_pile&quot;</span>), <span class="sc">~</span> <span class="fu">as.numeric</span>(.x)<span class="sc">-</span><span class="dv">1</span> ))</span>
+<span id="cb70-17"><a href="rgb-classification.html#cb70-17" tabindex="-1"></a>  , <span class="at">main =</span> <span class="st">&quot;Random Forest&quot;</span></span>
+<span id="cb70-18"><a href="rgb-classification.html#cb70-18" tabindex="-1"></a>)</span></code></pre></div>
+<p><img src="manitou_slash_piles_files/figure-html/unnamed-chunk-58-1.png" width="1008" /></p>
+<p>now lets check the confusion matrix of the pixel-based approach</p>
+<div class="sourceCode" id="cb71"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb71-1"><a href="rgb-classification.html#cb71-1" tabindex="-1"></a>confusion_matrix_temp <span class="ot">&lt;-</span></span>
+<span id="cb71-2"><a href="rgb-classification.html#cb71-2" tabindex="-1"></a>  validation_dta <span class="sc">%&gt;%</span> </span>
+<span id="cb71-3"><a href="rgb-classification.html#cb71-3" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(dplyr<span class="sc">::</span><span class="fu">across</span>(tidyselect<span class="sc">::</span><span class="fu">starts_with</span>(<span class="st">&quot;is_pile&quot;</span>), <span class="sc">~</span> <span class="fu">as.numeric</span>(.x)<span class="sc">-</span><span class="dv">1</span> )) <span class="sc">%&gt;%</span> </span>
+<span id="cb71-4"><a href="rgb-classification.html#cb71-4" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">rename</span>(</span>
+<span id="cb71-5"><a href="rgb-classification.html#cb71-5" tabindex="-1"></a>    <span class="at">presence =</span> is_pile</span>
+<span id="cb71-6"><a href="rgb-classification.html#cb71-6" tabindex="-1"></a>    , <span class="at">estimate =</span> is_pile_predicted</span>
+<span id="cb71-7"><a href="rgb-classification.html#cb71-7" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span> </span>
+<span id="cb71-8"><a href="rgb-classification.html#cb71-8" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">count</span>(presence,estimate) <span class="sc">%&gt;%</span> </span>
+<span id="cb71-9"><a href="rgb-classification.html#cb71-9" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(</span>
+<span id="cb71-10"><a href="rgb-classification.html#cb71-10" tabindex="-1"></a>    <span class="at">is_false =</span> <span class="fu">as.factor</span>(<span class="fu">ifelse</span>(presence<span class="sc">!=</span>estimate,<span class="dv">1</span>,<span class="dv">0</span>))</span>
+<span id="cb71-11"><a href="rgb-classification.html#cb71-11" tabindex="-1"></a>    , <span class="at">presence_fact =</span> <span class="fu">factor</span>(presence,<span class="at">levels =</span> <span class="dv">0</span><span class="sc">:</span><span class="dv">1</span>,<span class="at">labels =</span> <span class="fu">c</span>(<span class="st">&quot;Observed Absent&quot;</span>, <span class="st">&quot;Observed Present&quot;</span>))</span>
+<span id="cb71-12"><a href="rgb-classification.html#cb71-12" tabindex="-1"></a>    , <span class="at">estimate_fact =</span> <span class="fu">factor</span>(estimate,<span class="at">levels =</span> <span class="dv">0</span><span class="sc">:</span><span class="dv">1</span>,<span class="at">labels =</span> <span class="fu">c</span>(<span class="st">&quot;Predicted Absent&quot;</span>, <span class="st">&quot;Predicted Present&quot;</span>))</span>
+<span id="cb71-13"><a href="rgb-classification.html#cb71-13" tabindex="-1"></a>    , <span class="at">pct =</span> n<span class="sc">/</span><span class="fu">sum</span>(n)</span>
+<span id="cb71-14"><a href="rgb-classification.html#cb71-14" tabindex="-1"></a>  )</span>
+<span id="cb71-15"><a href="rgb-classification.html#cb71-15" tabindex="-1"></a><span class="co"># first function takes df with cols tp_n, fp_n, and fn_n to calculate rate</span></span>
+<span id="cb71-16"><a href="rgb-classification.html#cb71-16" tabindex="-1"></a>confusion_matrix_scores_fn <span class="ot">&lt;-</span> <span class="cf">function</span>(df) {</span>
+<span id="cb71-17"><a href="rgb-classification.html#cb71-17" tabindex="-1"></a>  df <span class="sc">%&gt;%</span> </span>
+<span id="cb71-18"><a href="rgb-classification.html#cb71-18" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(</span>
+<span id="cb71-19"><a href="rgb-classification.html#cb71-19" tabindex="-1"></a>    <span class="at">omission_rate =</span> dplyr<span class="sc">::</span><span class="fu">case_when</span>(</span>
+<span id="cb71-20"><a href="rgb-classification.html#cb71-20" tabindex="-1"></a>      (tp_n<span class="sc">+</span>fn_n) <span class="sc">==</span> <span class="dv">0</span>  <span class="sc">~</span> <span class="fu">as.numeric</span>(<span class="cn">NA</span>)</span>
+<span id="cb71-21"><a href="rgb-classification.html#cb71-21" tabindex="-1"></a>      , T <span class="sc">~</span> fn_n<span class="sc">/</span>(tp_n<span class="sc">+</span>fn_n)</span>
+<span id="cb71-22"><a href="rgb-classification.html#cb71-22" tabindex="-1"></a>    ) <span class="co"># False Negative Rate or Miss Rate</span></span>
+<span id="cb71-23"><a href="rgb-classification.html#cb71-23" tabindex="-1"></a>    , <span class="at">commission_rate =</span> dplyr<span class="sc">::</span><span class="fu">case_when</span>(</span>
+<span id="cb71-24"><a href="rgb-classification.html#cb71-24" tabindex="-1"></a>      (tp_n<span class="sc">+</span>fp_n) <span class="sc">==</span> <span class="dv">0</span>  <span class="sc">~</span> <span class="fu">as.numeric</span>(<span class="cn">NA</span>)</span>
+<span id="cb71-25"><a href="rgb-classification.html#cb71-25" tabindex="-1"></a>      , T <span class="sc">~</span> fp_n<span class="sc">/</span>(tp_n<span class="sc">+</span>fp_n)</span>
+<span id="cb71-26"><a href="rgb-classification.html#cb71-26" tabindex="-1"></a>    ) <span class="co"># False Positive Rate</span></span>
+<span id="cb71-27"><a href="rgb-classification.html#cb71-27" tabindex="-1"></a>    , <span class="at">precision =</span> dplyr<span class="sc">::</span><span class="fu">case_when</span>(</span>
+<span id="cb71-28"><a href="rgb-classification.html#cb71-28" tabindex="-1"></a>      (tp_n<span class="sc">+</span>fp_n) <span class="sc">==</span> <span class="dv">0</span>  <span class="sc">~</span> <span class="fu">as.numeric</span>(<span class="cn">NA</span>)</span>
+<span id="cb71-29"><a href="rgb-classification.html#cb71-29" tabindex="-1"></a>      , T <span class="sc">~</span> tp_n<span class="sc">/</span>(tp_n<span class="sc">+</span>fp_n)</span>
+<span id="cb71-30"><a href="rgb-classification.html#cb71-30" tabindex="-1"></a>    )</span>
+<span id="cb71-31"><a href="rgb-classification.html#cb71-31" tabindex="-1"></a>    , <span class="at">recall =</span> dplyr<span class="sc">::</span><span class="fu">case_when</span>(</span>
+<span id="cb71-32"><a href="rgb-classification.html#cb71-32" tabindex="-1"></a>      (tp_n<span class="sc">+</span>fn_n) <span class="sc">==</span> <span class="dv">0</span>  <span class="sc">~</span> <span class="fu">as.numeric</span>(<span class="cn">NA</span>)</span>
+<span id="cb71-33"><a href="rgb-classification.html#cb71-33" tabindex="-1"></a>      , T <span class="sc">~</span> tp_n<span class="sc">/</span>(tp_n<span class="sc">+</span>fn_n)</span>
+<span id="cb71-34"><a href="rgb-classification.html#cb71-34" tabindex="-1"></a>    )</span>
+<span id="cb71-35"><a href="rgb-classification.html#cb71-35" tabindex="-1"></a>    , <span class="at">f_score =</span> dplyr<span class="sc">::</span><span class="fu">case_when</span>(</span>
+<span id="cb71-36"><a href="rgb-classification.html#cb71-36" tabindex="-1"></a>      <span class="fu">is.na</span>(precision) <span class="sc">|</span> <span class="fu">is.na</span>(recall) <span class="sc">~</span> <span class="fu">as.numeric</span>(<span class="cn">NA</span>)</span>
+<span id="cb71-37"><a href="rgb-classification.html#cb71-37" tabindex="-1"></a>      , (precision<span class="sc">+</span>recall) <span class="sc">==</span> <span class="dv">0</span> <span class="sc">~</span> <span class="dv">0</span></span>
+<span id="cb71-38"><a href="rgb-classification.html#cb71-38" tabindex="-1"></a>      , T <span class="sc">~</span> <span class="dv">2</span> <span class="sc">*</span> ( (precision<span class="sc">*</span>recall)<span class="sc">/</span>(precision<span class="sc">+</span>recall) )</span>
+<span id="cb71-39"><a href="rgb-classification.html#cb71-39" tabindex="-1"></a>    )    </span>
+<span id="cb71-40"><a href="rgb-classification.html#cb71-40" tabindex="-1"></a>  ) </span>
+<span id="cb71-41"><a href="rgb-classification.html#cb71-41" tabindex="-1"></a>}</span>
+<span id="cb71-42"><a href="rgb-classification.html#cb71-42" tabindex="-1"></a>confusion_matrix_scores_temp <span class="ot">&lt;-</span> <span class="fu">confusion_matrix_scores_fn</span>(</span>
+<span id="cb71-43"><a href="rgb-classification.html#cb71-43" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">tibble</span>(</span>
+<span id="cb71-44"><a href="rgb-classification.html#cb71-44" tabindex="-1"></a>    <span class="at">tp_n =</span> confusion_matrix_temp <span class="sc">%&gt;%</span> dplyr<span class="sc">::</span><span class="fu">filter</span>(presence<span class="sc">==</span><span class="dv">1</span> <span class="sc">&amp;</span> estimate <span class="sc">==</span> <span class="dv">1</span>) <span class="sc">%&gt;%</span> dplyr<span class="sc">::</span><span class="fu">pull</span>(n)</span>
+<span id="cb71-45"><a href="rgb-classification.html#cb71-45" tabindex="-1"></a>    , <span class="at">fn_n =</span> confusion_matrix_temp <span class="sc">%&gt;%</span> dplyr<span class="sc">::</span><span class="fu">filter</span>(presence<span class="sc">==</span><span class="dv">1</span> <span class="sc">&amp;</span> estimate <span class="sc">==</span> <span class="dv">0</span>) <span class="sc">%&gt;%</span> dplyr<span class="sc">::</span><span class="fu">pull</span>(n)</span>
+<span id="cb71-46"><a href="rgb-classification.html#cb71-46" tabindex="-1"></a>    , <span class="at">fp_n =</span> confusion_matrix_temp <span class="sc">%&gt;%</span> dplyr<span class="sc">::</span><span class="fu">filter</span>(presence<span class="sc">==</span><span class="dv">0</span> <span class="sc">&amp;</span> estimate <span class="sc">==</span> <span class="dv">1</span>) <span class="sc">%&gt;%</span> dplyr<span class="sc">::</span><span class="fu">pull</span>(n)</span>
+<span id="cb71-47"><a href="rgb-classification.html#cb71-47" tabindex="-1"></a>  )</span>
+<span id="cb71-48"><a href="rgb-classification.html#cb71-48" tabindex="-1"></a>)</span>
+<span id="cb71-49"><a href="rgb-classification.html#cb71-49" tabindex="-1"></a><span class="co"># plot</span></span>
+<span id="cb71-50"><a href="rgb-classification.html#cb71-50" tabindex="-1"></a><span class="fu">ggplot</span>(<span class="at">data =</span>  confusion_matrix_temp, <span class="at">mapping =</span> <span class="fu">aes</span>(<span class="at">y =</span> estimate_fact, <span class="at">x =</span> presence_fact)) <span class="sc">+</span></span>
+<span id="cb71-51"><a href="rgb-classification.html#cb71-51" tabindex="-1"></a>  <span class="fu">geom_tile</span>(<span class="fu">aes</span>(<span class="at">fill =</span> is_false), <span class="at">color =</span> <span class="st">&quot;white&quot;</span>,<span class="at">alpha=</span><span class="fl">0.8</span>) <span class="sc">+</span></span>
+<span id="cb71-52"><a href="rgb-classification.html#cb71-52" tabindex="-1"></a>  <span class="fu">geom_text</span>(<span class="fu">aes</span>(<span class="at">label =</span> scales<span class="sc">::</span><span class="fu">comma</span>(n,<span class="at">accuracy=</span><span class="dv">1</span>)), <span class="at">vjust =</span> <span class="dv">1</span>,<span class="at">size =</span> <span class="dv">8</span>) <span class="sc">+</span></span>
+<span id="cb71-53"><a href="rgb-classification.html#cb71-53" tabindex="-1"></a>  <span class="fu">geom_text</span>(<span class="fu">aes</span>(<span class="at">label =</span> scales<span class="sc">::</span><span class="fu">percent</span>(pct,<span class="at">accuracy=</span><span class="fl">0.1</span>)), <span class="at">vjust =</span> <span class="fl">3.5</span>, <span class="at">size=</span><span class="dv">5</span>) <span class="sc">+</span></span>
+<span id="cb71-54"><a href="rgb-classification.html#cb71-54" tabindex="-1"></a>  <span class="fu">scale_fill_manual</span>(<span class="at">values=</span> <span class="fu">c</span>(<span class="st">&quot;turquoise&quot;</span>,<span class="st">&quot;tomato2&quot;</span>)) <span class="sc">+</span></span>
+<span id="cb71-55"><a href="rgb-classification.html#cb71-55" tabindex="-1"></a>  <span class="fu">scale_x_discrete</span>(<span class="at">position =</span> <span class="st">&quot;top&quot;</span>) <span class="sc">+</span></span>
+<span id="cb71-56"><a href="rgb-classification.html#cb71-56" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb71-57"><a href="rgb-classification.html#cb71-57" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">&quot;Predicted&quot;</span></span>
+<span id="cb71-58"><a href="rgb-classification.html#cb71-58" tabindex="-1"></a>    , <span class="at">x =</span> <span class="st">&quot;Observed&quot;</span></span>
+<span id="cb71-59"><a href="rgb-classification.html#cb71-59" tabindex="-1"></a>    , <span class="at">subtitle =</span> <span class="fu">paste0</span>(</span>
+<span id="cb71-60"><a href="rgb-classification.html#cb71-60" tabindex="-1"></a>      <span class="st">&quot;True positive rate (recall) = &quot;</span></span>
+<span id="cb71-61"><a href="rgb-classification.html#cb71-61" tabindex="-1"></a>        , confusion_matrix_scores_temp<span class="sc">$</span>recall <span class="sc">%&gt;%</span> </span>
+<span id="cb71-62"><a href="rgb-classification.html#cb71-62" tabindex="-1"></a>          scales<span class="sc">::</span><span class="fu">percent</span>(<span class="at">accuracy =</span> <span class="fl">0.1</span>)</span>
+<span id="cb71-63"><a href="rgb-classification.html#cb71-63" tabindex="-1"></a>      , <span class="st">&quot;</span><span class="sc">\n</span><span class="st">Precision (PPV) = &quot;</span></span>
+<span id="cb71-64"><a href="rgb-classification.html#cb71-64" tabindex="-1"></a>        , confusion_matrix_scores_temp<span class="sc">$</span>precision <span class="sc">%&gt;%</span> </span>
+<span id="cb71-65"><a href="rgb-classification.html#cb71-65" tabindex="-1"></a>          scales<span class="sc">::</span><span class="fu">percent</span>(<span class="at">accuracy =</span> <span class="fl">0.1</span>)</span>
+<span id="cb71-66"><a href="rgb-classification.html#cb71-66" tabindex="-1"></a>      , <span class="st">&quot;</span><span class="sc">\n</span><span class="st">F1-score = &quot;</span></span>
+<span id="cb71-67"><a href="rgb-classification.html#cb71-67" tabindex="-1"></a>        , confusion_matrix_scores_temp<span class="sc">$</span>f_score <span class="sc">%&gt;%</span> </span>
+<span id="cb71-68"><a href="rgb-classification.html#cb71-68" tabindex="-1"></a>          scales<span class="sc">::</span><span class="fu">percent</span>(<span class="at">accuracy =</span> <span class="fl">0.1</span>)</span>
+<span id="cb71-69"><a href="rgb-classification.html#cb71-69" tabindex="-1"></a>    )</span>
+<span id="cb71-70"><a href="rgb-classification.html#cb71-70" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb71-71"><a href="rgb-classification.html#cb71-71" tabindex="-1"></a>  <span class="fu">theme_light</span>() <span class="sc">+</span> </span>
+<span id="cb71-72"><a href="rgb-classification.html#cb71-72" tabindex="-1"></a>  <span class="fu">theme</span>(</span>
+<span id="cb71-73"><a href="rgb-classification.html#cb71-73" tabindex="-1"></a>    <span class="at">legend.position =</span> <span class="st">&quot;none&quot;</span></span>
+<span id="cb71-74"><a href="rgb-classification.html#cb71-74" tabindex="-1"></a>    , <span class="at">panel.grid =</span> <span class="fu">element_blank</span>()</span>
+<span id="cb71-75"><a href="rgb-classification.html#cb71-75" tabindex="-1"></a>    , <span class="at">plot.title =</span> <span class="fu">element_text</span>(<span class="at">size =</span> <span class="dv">9</span>)</span>
+<span id="cb71-76"><a href="rgb-classification.html#cb71-76" tabindex="-1"></a>    , <span class="at">plot.subtitle =</span> <span class="fu">element_text</span>(<span class="at">size =</span> <span class="dv">9</span>)</span>
+<span id="cb71-77"><a href="rgb-classification.html#cb71-77" tabindex="-1"></a>  )</span></code></pre></div>
+<p><img src="manitou_slash_piles_files/figure-html/unnamed-chunk-59-1.png" width="1008" /></p>
+<p>that’s not very good as we could tell from the prediction map</p>
+
+</div>
+</div>
+            </section>
+
+          </div>
+        </div>
+      </div>
+<a href="data-processing.html" class="navigation navigation-prev " aria-label="Previous page"><i class="fa fa-angle-left"></i></a>
+<a href="point-cloud-classification.html" class="navigation navigation-next " aria-label="Next page"><i class="fa fa-angle-right"></i></a>
+    </div>
+  </div>
+<script src="libs/gitbook-2.6.7/js/app.min.js"></script>
+<script src="libs/gitbook-2.6.7/js/clipboard.min.js"></script>
+<script src="libs/gitbook-2.6.7/js/plugin-search.js"></script>
+<script src="libs/gitbook-2.6.7/js/plugin-sharing.js"></script>
+<script src="libs/gitbook-2.6.7/js/plugin-fontsettings.js"></script>
+<script src="libs/gitbook-2.6.7/js/plugin-bookdown.js"></script>
+<script src="libs/gitbook-2.6.7/js/jquery.highlight.js"></script>
+<script src="libs/gitbook-2.6.7/js/plugin-clipboard.js"></script>
+<script>
+gitbook.require(["gitbook"], function(gitbook) {
+gitbook.start({
+  "sharing": {
+    "github": false,
+    "facebook": true,
+    "twitter": true,
+    "linkedin": false,
+    "weibo": false,
+    "instapaper": false,
+    "vk": false,
+    "whatsapp": false,
+    "all": ["facebook", "twitter", "linkedin", "weibo", "instapaper"]
+  },
+  "fontsettings": {
+    "theme": "white",
+    "family": "sans",
+    "size": 2
+  },
+  "edit": {
+    "link": null,
+    "text": null
+  },
+  "history": {
+    "link": null,
+    "text": null
+  },
+  "view": {
+    "link": null,
+    "text": null
+  },
+  "download": null,
+  "search": {
+    "engine": "fuse",
+    "options": null
+  },
+  "toc": {
+    "collapse": "subsection"
+  }
+});
+});
+</script>
+
+</body>
+
+</html>
