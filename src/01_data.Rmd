@@ -76,121 +76,6 @@ where?
 mapview::mapview(slash_piles_polys, zcol = "comment", layer.name = "slash piles")
 ```
 
-## Point Cloud Data
-
-Let's check out the point cloud data we got using UAS-SfM methods
-
-```{r}
-# directory with the downloaded .las|.laz files
-f_temp <- 
-  "D:\\PFDP_Data\\p4pro_images\\P4Pro_06_17_2021_half_half_optimal\\2_densification\\point_cloud"
-  # system.file(package = "lidR", "extdata", "Megaplot.laz")
-# is there data?
-list.files(f_temp, pattern = ".*\\.(laz|las)$") %>% length()
-# what files are in here?
-list.files(f_temp, pattern = ".*\\.(laz|las)$")[1]
-```
-
-what information does `lidR` read from the catalog?
-
-```{r}
-las_ctg <- lidR::readLAScatalog(f_temp)
-# set the processing options
-lidR::opt_progress(las_ctg) <- F
-lidR::opt_filter(las_ctg) <- "-drop_duplicates"
-lidR::opt_select(las_ctg) <- "xyziRGB"
-# huh?
-las_ctg
-```
-
-that's a lot of points...can an ordinary laptop handle it? we'll find out.
-
-We'll plot our point cloud data tiles real quick to orient ourselves
-
-```{r}
-las_ctg %>% 
-  purrr::pluck("data") %>% 
-  mapview::mapview(popup = F, layer.name = "point cloud tile")
-```
-
-## Check out one pile
-
-```{r}
-las_temp <- lidR::clip_roi(
-  las_ctg
-  # biggest mechanical
-  , slash_piles_points %>%
-    dplyr::filter(tolower(comment)=="mechanical pile") %>% 
-    dplyr::arrange(desc(diameter)) %>% 
-    dplyr::slice(1) %>% 
-    sf::st_zm() %>% 
-    sf::st_buffer(10, endCapStyle = "SQUARE") %>% 
-    sf::st_transform(lidR::st_crs(las_ctg))
-)
-```
-
-what did we get?
-
-```{r}
-las_temp@data %>% dplyr::glimpse()
-```
-
-plot a sample
-
-```{r,echo=FALSE,message=FALSE,warning=FALSE}
-## if want to get current rgl parameters
-# rgl::par3d()$zoom
-# rgl::par3d()$FOV
-# rgl::par3d()$userMatrix %>% c()
-# rgl::par3d()$windowRect
-## set up for printing rgl graphics
-r3dDefaults <- rgl::r3dDefaults
-m  <- structure(c(
-  -0.39951634,0.09665099, -0.91161686,0.00000000, -0.90745372,0.09938181,0.40822852,0.00000000,0.13005376,0.99034417,0.04800174,0.00000000,0.00000000,0.00000000
-,0.00000000,1.00000000
-), .Dim = c(4L, 4L))
-r3dDefaults$FOV <- 30
-r3dDefaults$userMatrix <- m
-r3dDefaults$zoom <- 0.78
-r3dDefaults$windowRect <- c(0,23,1536,864)
-rgl::setupKnitr(autoprint = TRUE)
-```
-
-```{r, rgl = TRUE}
-las_temp %>% 
-  lidR::plot(
-    color = "Z", bg = "white", legend = F
-   , pal = harrypotter::hp(n=50, house = "gryffindor")
-  )
-```
-
-make a gif
-
-```{r}
-library(magick)
-if(!file.exists(file.path("../data/", "pile_z.gif"))){
-  rgl::close3d()
-  lidR::plot(
-    las_temp, color = "Z", bg = "white", legend = F
-   , pal = harrypotter::hp(n=50, house = "gryffindor")
-  )
-  rgl::movie3d( rgl::spin3d(), duration = 10, fps = 10 , movie = "pile_z", dir = "../data/")
-  rgl::close3d()
-}
-```
-
-```{r}
-library(magick)
-if(!file.exists(file.path("../data/", "pile_rgb.gif"))){
-  rgl::close3d()
-  lidR::plot(
-    las_temp, color = "RGB", bg = "white", legend = F
-  )
-  rgl::movie3d( rgl::spin3d(), duration = 10, fps = 10 , movie = "pile_rgb", dir = "../data/")
-  rgl::close3d()
-}
-```
-
 ## Load RGB orthomosaic rasters
 
 Orthomosaic `tif` files from the UAS flight imagery that were created in [Agisoft Metashape](https://www.agisoft.com/) are loaded and stitched together via `terra::mosaic`.
@@ -447,3 +332,123 @@ object-based image analysis will require polygon data so that we have sets of pi
 
 another challenge will be training a spectral-based model with the different lighting conditions in the imagery (e.g. piles in shadows or under tree crowns). this different lighting may have also influenced the point cloud generation
 
+## Point Cloud Data
+
+Let's check out the point cloud data we got using UAS-SfM methods
+
+```{r}
+# directory with the downloaded .las|.laz files
+f_temp <- 
+  "D:\\PFDP_Data\\p4pro_images\\P4Pro_06_17_2021_half_half_optimal\\2_densification\\point_cloud"
+  # system.file(package = "lidR", "extdata", "Megaplot.laz")
+# is there data?
+list.files(f_temp, pattern = ".*\\.(laz|las)$") %>% length()
+# what files are in here?
+list.files(f_temp, pattern = ".*\\.(laz|las)$")[1]
+```
+
+what information does `lidR` read from the catalog?
+
+```{r}
+las_ctg <- lidR::readLAScatalog(f_temp)
+# set the processing options
+lidR::opt_progress(las_ctg) <- F
+lidR::opt_filter(las_ctg) <- "-drop_duplicates"
+lidR::opt_select(las_ctg) <- "xyziRGB"
+# huh?
+las_ctg
+```
+
+that's a lot of points...can an ordinary laptop handle it? we'll find out.
+
+We'll plot our point cloud data tiles real quick to orient ourselves
+
+```{r}
+las_ctg %>% 
+  purrr::pluck("data") %>% 
+  mapview::mapview(popup = F, layer.name = "point cloud tile")
+```
+
+## Check out one pile
+
+```{r}
+las_temp <- lidR::clip_roi(
+  las_ctg
+  # biggest mechanical
+  , slash_piles_points %>%
+    dplyr::filter(tolower(comment)=="mechanical pile") %>% 
+    dplyr::arrange(desc(diameter)) %>% 
+    dplyr::slice(1) %>% 
+    sf::st_zm() %>% 
+    sf::st_buffer(10, endCapStyle = "SQUARE") %>% 
+    sf::st_transform(lidR::st_crs(las_ctg))
+)
+```
+
+what did we get?
+
+```{r}
+las_temp@data %>% dplyr::glimpse()
+```
+
+plot a sample
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+## if want to get current rgl parameters
+# rgl::par3d()$zoom
+# rgl::par3d()$FOV
+# rgl::par3d()$userMatrix %>% c()
+# rgl::par3d()$windowRect
+## set up for printing rgl graphics
+r3dDefaults <- rgl::r3dDefaults
+m  <- structure(c(
+  -0.39951634,0.09665099, -0.91161686,0.00000000, -0.90745372,0.09938181,0.40822852,0.00000000,0.13005376,0.99034417,0.04800174,0.00000000,0.00000000,0.00000000
+,0.00000000,1.00000000
+), .Dim = c(4L, 4L))
+r3dDefaults$FOV <- 30
+r3dDefaults$userMatrix <- m
+r3dDefaults$zoom <- 0.78
+r3dDefaults$windowRect <- c(0,23,1536,864)
+rgl::setupKnitr(autoprint = TRUE)
+```
+
+```{r, rgl = TRUE}
+las_temp %>% 
+  lidR::plot(
+    color = "Z", bg = "white", legend = F
+   , pal = harrypotter::hp(n=50, house = "gryffindor")
+  )
+```
+
+make a gif
+
+```{r}
+library(magick)
+if(!file.exists(file.path("../data/", "pile_z.gif"))){
+  rgl::close3d()
+  lidR::plot(
+    las_temp, color = "Z", bg = "white", legend = F
+   , pal = harrypotter::hp(n=50, house = "gryffindor")
+  )
+  rgl::movie3d( rgl::spin3d(), duration = 10, fps = 10 , movie = "pile_z", dir = "../data/")
+  rgl::close3d()
+}
+```
+
+```{r}
+library(magick)
+if(!file.exists(file.path("../data/", "pile_rgb.gif"))){
+  rgl::close3d()
+  lidR::plot(
+    las_temp, color = "RGB", bg = "white", legend = F
+  )
+  rgl::movie3d( rgl::spin3d(), duration = 10, fps = 10 , movie = "pile_rgb", dir = "../data/")
+  rgl::close3d()
+}
+```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE, include=FALSE}
+remove(list = ls()[grep("_temp",ls())])
+remove(f, r3dDefaults, m)
+gc()
+```

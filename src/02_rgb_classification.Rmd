@@ -192,6 +192,11 @@ terra::plotRGB(
   # , scale = c(255,7,520)
   , stretch = "hist", colNA = "transparent"
 )
+# add polys
+terra::plot(
+  slash_piles_polys %>% sf::st_transform(terra::crs(grvi_rast)) %>% terra::vect()
+  , add = T, border = "white", col = NA
+)
 ```
 
 ### Raster Texture: GRVI
@@ -212,6 +217,11 @@ terra::plotRGB(
   rodmanetal2019_grvi_rast$composite
   # , scale = c(255,7,520)
   , stretch = "hist", colNA = "transparent"
+)
+# add polys
+terra::plot(
+  slash_piles_polys %>% sf::st_transform(terra::crs(grvi_rast)) %>% terra::vect()
+  , add = T, border = "white", col = NA
 )
 ```
 
@@ -361,7 +371,7 @@ check out correlations between covariates
 # investigate correlation among environmental covariates
 pred_rast %>% 
   terra::pairs(
-    maxcells = min(10000, terra::ncell(pred_rast)*.01)
+    maxcells = min(7777, terra::ncell(pred_rast)*.01)
   )
 ```
 
@@ -410,13 +420,6 @@ pred_df <- terra::as.data.frame(
       .cols = c(red,green,blue)
       , .fns = ~ ifelse(.x==0,NA,.x)
     )
-  ) %>% 
-  # we can't have NA values in kmeans
-  dplyr::mutate(
-    dplyr::across(
-      .cols = dplyr::everything()
-      , .fns = ~ as.numeric(ifelse(is.na(.x),-99,.x))
-    )
   )
 # what is this data?
 pred_df %>% dplyr::slice_sample(n=100) %>% dplyr::glimpse()
@@ -428,7 +431,15 @@ perform kmeans clustering
 set.seed(111)
 # Create 6 clusters, allow 500 iterations, start with 5 random sets using "Lloyd"
 kmncluster <- stats::kmeans(
-  pred_df %>% dplyr::select(-c(cell,x,y))
+  pred_df %>% 
+    dplyr::select(-c(cell,x,y)) %>% 
+    # we can't have NA values in kmeans
+    dplyr::mutate(
+      dplyr::across(
+        .cols = dplyr::everything()
+        , .fns = ~ as.numeric(ifelse(is.na(.x),-99,.x))
+      )
+    )
   , centers=6
   , iter.max = 500
   , nstart = 5
@@ -463,6 +474,12 @@ terra::plot(
   , col = viridis::turbo(n=6)
   , axes=F, legend = F
 )
+# add polys
+terra::plot(
+  slash_piles_polys %>% sf::st_transform(terra::crs(grvi_rast)) %>% terra::vect()
+  , add = T, border = "white", col = NA
+)
+
 ```
 
 neat, let's see if the piles are classified by making a custom function to plot the classified raster and RGB side-by-side
@@ -555,58 +572,416 @@ ggplot2::ggsave("../data/pile_tiles_kmeans6.jpeg", height = 10.5, width = 8)
 
 there is no discernible pattern between the kmeans classes and the slash piles because the lighting and conditions around the piles are not consistent. this result also highlights the challenges we'll likely face with pixel-based classification methods
 
-
 ## Supervised classification
 
-first, we'll generate a set of sample points to extract raster values from 
+we'll start with a pixel-based classification using the image-annotated pile polygons to train a classification model
+
+first, let's set aside some piles for use in validation
 
 ```{r}
-grvi_rast %>% 
-  terra::mask(
+set.seed(333)
+# 20% will be used for validation
+slash_piles_polys <- slash_piles_polys %>% 
+  dplyr::left_join(
     slash_piles_polys %>% 
+      sf::st_drop_geometry() %>% 
       dplyr::filter(!is.na(comment)) %>% 
-      sf::st_transform(terra::crs(grvi_rast)) %>% 
-      terra::vect()
+      dplyr::distinct(pile_id) %>%
+      dplyr::slice_sample(prop = 0.2) %>% 
+      dplyr::mutate(is_training = F)
+    , by = "pile_id"
+  ) %>% 
+  dplyr::mutate(is_training = dplyr::coalesce(is_training, T))
+slash_piles_points <- slash_piles_points %>% 
+  dplyr::left_join(
+    slash_piles_polys %>% 
+      sf::st_drop_geometry() %>% 
+      dplyr::distinct(objectid, is_training)
+    , by = "objectid"
+  )
+# slash_piles_points %>% sf::st_drop_geometry() %>% dplyr::count(is_training)
+```
+
+first, we'll generate a set of sample points to extract raster values from to build our training data with covariates
+
+```{r}
+training_points <- dplyr::bind_rows(
+# sample only from non-pile parts of the raster
+  terra::mask(
+    grvi_rast
+    , slash_piles_polys %>% # use ALL piles (image-annotated and field-collected)
+        sf::st_transform(terra::crs(grvi_rast)) %>% 
+        terra::vect()
     , inverse = T
   ) %>%
-  terra::plot()
-terra::points(
-  grvi_rast %>% 
-  terra::mask(
-    slash_piles_polys %>% 
-      dplyr::filter(!is.na(comment)) %>% 
-      sf::st_transform(terra::crs(grvi_rast)) %>% 
-      terra::vect()
-    , inverse = T
-  ) %>%
-    terra::spatSample(size = 1000)
-)
-grvi_rast %>% 
-  terra::mask(
-    slash_piles_polys %>% 
-      dplyr::filter(!is.na(comment)) %>% 
-      sf::st_transform(terra::crs(grvi_rast)) %>% 
-      terra::vect()
-    , inverse = T
-  ) %>%
-    terra::spatSample(size = 10, na.rm = T)
-# pile samples
-  slash_piles_polys %>% 
-    dplyr::filter(!is.na(comment)) %>% 
+  terra::spatSample(size = 5000, na.rm = T, xy = T) %>% 
+  sf::st_as_sf(coords = c("x", "y"), crs = terra::crs(grvi_rast)) %>% 
+  dplyr::mutate(
+    is_pile = 0
+  ) %>% 
+  dplyr::select(is_pile)
+# sample points within piles
+  , slash_piles_polys %>% 
+    dplyr::filter(
+      is_training
+    ) %>% 
     sf::st_transform(terra::crs(grvi_rast)) %>% 
     terra::vect() %>% 
-    terra::spatSample(size = 100) %>% 
+    terra::spatSample(size = 1000) %>% 
     sf::st_as_sf() %>% 
     dplyr::mutate(
       is_pile = 1
     ) %>% 
     dplyr::select(is_pile)
+) %>% 
+dplyr::mutate(
+  id = dplyr::row_number()
+  , is_pile = as.factor(is_pile)
+  , x = sf::st_coordinates(.)[,1]
+  , y = sf::st_coordinates(.)[,2]
+)
+####### validation points since we'll validate at the pixel level
+validation_points <- dplyr::bind_rows(
+# sample only from non-pile parts of the raster
+  terra::mask(
+    grvi_rast
+    , slash_piles_polys %>% # use ALL piles (image-annotated and field-collected)
+        sf::st_transform(terra::crs(grvi_rast)) %>% 
+        terra::vect()
+    , inverse = T
+  ) %>%
+  # mask the training points as well
+  terra::mask(
+    training_points %>% terra::vect()
+    , inverse = T
+  ) %>% 
+  terra::spatSample(size = 5000, na.rm = T, xy = T) %>% 
+  sf::st_as_sf(coords = c("x", "y"), crs = terra::crs(grvi_rast)) %>% 
+  dplyr::mutate(
+    is_pile = 0
+  ) %>% 
+  dplyr::select(is_pile)
+# sample points within piles
+  , slash_piles_polys %>% 
+    dplyr::filter(
+      !is_training
+    ) %>% 
+    sf::st_transform(terra::crs(grvi_rast)) %>% 
+    terra::vect() %>% 
+    terra::spatSample(size = 1000) %>% 
+    sf::st_as_sf() %>% 
+    dplyr::mutate(
+      is_pile = 1
+    ) %>% 
+    dplyr::select(is_pile)
+) %>% 
+dplyr::mutate(
+  id = dplyr::row_number()
+  , is_pile = as.factor(is_pile)
+  , x = sf::st_coordinates(.)[,1]
+  , y = sf::st_coordinates(.)[,2]
+)
 ```
 
+plot our RGB with training piles (white), validation piles(black), pile sample points (red), and non-pile sample points (blue)
+
+```{r}
+# let's check this out
+terra::plotRGB(ortho_rast, stretch = "lin", colNA = "transparent")
+terra::plot(
+  slash_piles_polys %>% 
+    dplyr::filter(is_training) %>% 
+    sf::st_transform(terra::crs(ortho_rast)) %>% terra::vect()
+  , add = T, border = "white", col = NA, lwd = 1.2
+)
+terra::plot(
+  slash_piles_polys %>% 
+    dplyr::filter(!is_training) %>% 
+    sf::st_transform(terra::crs(ortho_rast)) %>% terra::vect()
+  , add = T, border = "black", col = NA, lwd = 1.2
+)
+terra::plot(training_points %>% dplyr::filter(is_pile==1) %>% terra::vect(), col = "red", cex = 0.5, add = T)
+terra::plot(training_points %>% dplyr::filter(is_pile==0) %>% terra::vect(), col = "blue", cex = 0.5, add = T)
+```
 
 extract the raster cell values from each layer in our RGB-based raster data, these values will be the predictor variables
 
 ```{r}
-
+#############################
+#extract covariate data at point locations
+#############################
+training_dta <-
+  terra::extract(
+    pred_rast
+    , training_points %>%  
+      terra::vect()
+    , ID = F
+  ) %>%  
+  dplyr::bind_cols(
+    training_points %>%  
+      dplyr::select(id,is_pile,x,y)
+  ) %>%  
+  ## make sure no data is missing
+  dplyr::filter(dplyr::if_all(dplyr::everything(), ~ !is.na(.x)))
+  # ## square continuous vars?
+  # dplyr::mutate(dplyr::across(
+  #   .cols = dplyr::where(is.numeric) & !c(id, is_pile, x, y) & !tidyselect::ends_with("local_minima")
+  #   , .fns = list(sq)
+  #   , .names = "{.col}_sq" 
+  # ))
+##### and validation data to perform accuracy assesment at the pixel level
+validation_dta <-
+  terra::extract(
+    pred_rast
+    , validation_points %>%  
+      terra::vect()
+    , ID = F
+  ) %>%  
+  dplyr::bind_cols(
+    validation_points %>%  
+      dplyr::select(id,is_pile,x,y)
+  ) %>%  
+  ## make sure no data is missing
+  dplyr::filter(dplyr::if_all(dplyr::everything(), ~ !is.na(.x)))
+  # ## square continuous vars?
+  # dplyr::mutate(dplyr::across(
+  #   .cols = dplyr::where(is.numeric) & !c(id, is_pile, x, y) & !tidyselect::ends_with("local_minima")
+  #   , .fns = list(sq)
+  #   , .names = "{.col}_sq" 
+  # ))
 ```
 
+compare training and validation data to ensure that they are similar (i.e. we drew a big enough sample)
+
+```{r}
+dplyr::bind_rows(
+    training_dta %>% sf::st_drop_geometry() %>% dplyr::mutate(dta_set = "Training")
+    , validation_dta %>% sf::st_drop_geometry() %>% dplyr::mutate(dta_set = "Validation")
+  ) %>% 
+  dplyr::select(-c(geometry,dplyr::ends_with("_sq"))) %>% 
+  dplyr::mutate_if(is.factor, as.numeric) %>% 
+  tidyr::pivot_longer(
+    cols = -c(id, is_pile, dta_set)
+    , names_to = "covariate"
+    , values_to = "value"
+  ) %>% 
+  dplyr::mutate(covariate = stringr::str_replace_all(covariate,"_", " ")) %>% 
+ggplot(mapping = aes(x = value, color = dta_set, fill = dta_set, group = dta_set)) +
+  geom_density(alpha=0.6) +
+  facet_wrap(
+    facets = vars(covariate), scales = "free"
+    , labeller = label_wrap_gen(width = 25, multi_line = TRUE)
+  ) + 
+  scale_color_viridis_d(option = "cividis") +
+  scale_fill_viridis_d(option = "cividis") +
+  labs(
+    title = "Distribution of Model Covariates"
+    , subtitle = paste0(
+      "by Training (n="
+      , nrow(training_dta) %>% scales::comma(accuracy = 1)
+      , ") and Validation (n="
+      , nrow(validation_dta) %>% scales::comma(accuracy = 1)
+      , ") data"
+    )
+  ) +
+  theme_light() + 
+  theme(
+    legend.position = "top"
+    , legend.title = element_blank()
+    , plot.title = element_text(size = 10)
+    , plot.subtitle = element_text(size = 9)
+    , axis.title = element_text(size = 7)
+    , axis.text = element_text(size = 6)
+  ) + 
+  guides(color = guide_legend(override.aes = list(size = 5)))
+```
+
+we'll use a random forest model to predict raster values
+
+```{r}
+# Tune on the full data if below threshold
+tune_result_temp <- randomForest::tuneRF(
+  y = training_dta$is_pile
+  , x = training_dta %>% sf::st_drop_geometry() %>% dplyr::select(-c(id,is_pile,geometry))
+  , ntreeTry = 500
+  , stepFactor = 1
+  , improve = 0.03
+  , plot = F
+  , trace = F
+)
+# Extract the optimal mtry value
+optimal_mtry_temp <- tune_result_temp %>%
+  dplyr::as_tibble() %>%
+  dplyr::filter(OOBError==min(OOBError)) %>%
+  dplyr::filter(dplyr::row_number() == 1) %>%
+  dplyr::pull(mtry) %>%
+  as.numeric()
+# pass to random forest model
+mod_rf <- randomForest::randomForest(
+  y = training_dta$is_pile
+  , x = training_dta %>% sf::st_drop_geometry() %>% dplyr::select(-c(id,is_pile,geometry))
+  , mtry = optimal_mtry_temp
+  , na.action = na.omit
+  , ntree = 500
+)
+```
+
+random forest variable importance plot
+
+```{r}
+#variable importance plot
+randomForest::varImpPlot(mod_rf)
+```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE, include=FALSE}
+remove(list = ls()[grep("_temp",ls())])
+gc()
+```
+
+predict raster values
+
+```{r}
+# x,y rasters
+y_rast_temp <- terra::init(pred_rast[[1]], "y")
+names(y_rast_temp) <- "y"
+x_rast_temp <- terra::init(pred_rast[[1]], "x")
+names(x_rast_temp) <- "x"
+# predict
+rf_pred_rast <- terra::predict(
+  object = c(
+      pred_rast
+      , x_rast_temp, y_rast_temp
+    )
+  , model = mod_rf
+  , na.rm = T
+  # , type = "prob"
+)
+terra::coltab(rf_pred_rast) <- data.frame(value=1:2, col=c("gray", "khaki"))
+levels(rf_pred_rast) <- data.frame(value=1:2, col=c("non-pile", "pile"))
+```
+
+plot pixel-level predictions
+
+```{r}
+#plot
+terra::plot(rf_pred_rast)
+terra::plot(
+  slash_piles_polys %>% 
+    dplyr::filter(is_training) %>% 
+    sf::st_transform(terra::crs(ortho_rast)) %>% terra::vect()
+  , add = T, border = "white", col = NA, lwd = 1.2
+)
+terra::plot(
+  slash_piles_polys %>% 
+    dplyr::filter(!is_training) %>% 
+    sf::st_transform(terra::crs(ortho_rast)) %>% terra::vect()
+  , add = T, border = "black", col = NA, lwd = 1.2
+)
+```
+
+evaluate model performance based on the Area under the Receiver Operating Characteristic (ROC) Curve (AUC) criterion (an AUC value of 0.5 can be interpreted as the model performing no better than a random prediction). Higher AUC values indicate that the model is better at predicting "absence" classes as "absence" (true negative) and "presence" classes as "presence" (true positive).
+
+```{r}
+validation_dta <-
+  validation_dta %>% 
+  dplyr::bind_cols(
+    terra::extract(
+      rf_pred_rast
+      , validation_points %>% terra::vect()
+      , ID = F
+    ) %>% 
+    dplyr::rename(is_pile_predicted=1)
+  )
+
+PresenceAbsence::auc.roc.plot(
+  validation_dta %>% 
+    sf::st_drop_geometry() %>% 
+    dplyr::select(id, is_pile, is_pile_predicted) %>% 
+    dplyr::mutate(dplyr::across(tidyselect::starts_with("is_pile"), ~ as.numeric(.x)-1 ))
+  , main = "Random Forest"
+)
+```
+
+now lets check the confusion matrix of the pixel-based approach
+
+```{r}
+confusion_matrix_temp <-
+  validation_dta %>% 
+  dplyr::mutate(dplyr::across(tidyselect::starts_with("is_pile"), ~ as.numeric(.x)-1 )) %>% 
+  dplyr::rename(
+    presence = is_pile
+    , estimate = is_pile_predicted
+  ) %>% 
+  dplyr::count(presence,estimate) %>% 
+  dplyr::mutate(
+    is_false = as.factor(ifelse(presence!=estimate,1,0))
+    , presence_fact = factor(presence,levels = 0:1,labels = c("Observed Absent", "Observed Present"))
+    , estimate_fact = factor(estimate,levels = 0:1,labels = c("Predicted Absent", "Predicted Present"))
+    , pct = n/sum(n)
+  )
+# first function takes df with cols tp_n, fp_n, and fn_n to calculate rate
+confusion_matrix_scores_fn <- function(df) {
+  df %>% 
+  dplyr::mutate(
+    omission_rate = dplyr::case_when(
+      (tp_n+fn_n) == 0  ~ as.numeric(NA)
+      , T ~ fn_n/(tp_n+fn_n)
+    ) # False Negative Rate or Miss Rate
+    , commission_rate = dplyr::case_when(
+      (tp_n+fp_n) == 0  ~ as.numeric(NA)
+      , T ~ fp_n/(tp_n+fp_n)
+    ) # False Positive Rate
+    , precision = dplyr::case_when(
+      (tp_n+fp_n) == 0  ~ as.numeric(NA)
+      , T ~ tp_n/(tp_n+fp_n)
+    )
+    , recall = dplyr::case_when(
+      (tp_n+fn_n) == 0  ~ as.numeric(NA)
+      , T ~ tp_n/(tp_n+fn_n)
+    )
+    , f_score = dplyr::case_when(
+      is.na(precision) | is.na(recall) ~ as.numeric(NA)
+      , (precision+recall) == 0 ~ 0
+      , T ~ 2 * ( (precision*recall)/(precision+recall) )
+    )    
+  ) 
+}
+confusion_matrix_scores_temp <- confusion_matrix_scores_fn(
+  dplyr::tibble(
+    tp_n = confusion_matrix_temp %>% dplyr::filter(presence==1 & estimate == 1) %>% dplyr::pull(n)
+    , fn_n = confusion_matrix_temp %>% dplyr::filter(presence==1 & estimate == 0) %>% dplyr::pull(n)
+    , fp_n = confusion_matrix_temp %>% dplyr::filter(presence==0 & estimate == 1) %>% dplyr::pull(n)
+  )
+)
+# plot
+ggplot(data =  confusion_matrix_temp, mapping = aes(y = estimate_fact, x = presence_fact)) +
+  geom_tile(aes(fill = is_false), color = "white",alpha=0.8) +
+  geom_text(aes(label = scales::comma(n,accuracy=1)), vjust = 1,size = 8) +
+  geom_text(aes(label = scales::percent(pct,accuracy=0.1)), vjust = 3.5, size=5) +
+  scale_fill_manual(values= c("turquoise","tomato2")) +
+  scale_x_discrete(position = "top") +
+  labs(
+    y = "Predicted"
+    , x = "Observed"
+    , subtitle = paste0(
+      "True positive rate (recall) = "
+        , confusion_matrix_scores_temp$recall %>% 
+          scales::percent(accuracy = 0.1)
+      , "\nPrecision (PPV) = "
+        , confusion_matrix_scores_temp$precision %>% 
+          scales::percent(accuracy = 0.1)
+      , "\nF1-score = "
+        , confusion_matrix_scores_temp$f_score %>% 
+          scales::percent(accuracy = 0.1)
+    )
+  ) +
+  theme_light() + 
+  theme(
+    legend.position = "none"
+    , panel.grid = element_blank()
+    , plot.title = element_text(size = 9)
+    , plot.subtitle = element_text(size = 9)
+  )
+```
+
+that's not very good as we could tell from the prediction map
