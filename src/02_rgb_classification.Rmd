@@ -80,7 +80,6 @@ round_to_nearest_odd <- function(x) {
 # round_to_nearest_odd(c(3.5, 4.2, 6.1, 7))
 ```
 
-
 ```{r}
 rast_rodmanetal2019_fn <- function(
     rast, windows_m = c(3,5,7,9,11,13,15), scale_to_1m = T
@@ -341,7 +340,7 @@ patchwork::wrap_plots(
 ggplot2::ggsave("../data/pile_tiles_texture.jpeg", height = 10.5, width = 5)
 ```
 
-## Unsupervised classification
+## Pixel-based: unsupervised classification
 
 Unsupervised image classification could be used to identify slash piles by grouping pixels with similar spectral characteristics. We'll call any method that implements classification at the pixel level like the unsupervised classification approach tested here "pixel-based image analysis" versus to OBIA. Unsupervised image classification uses algorithms like K-means to find natural clusters within spectral data and can use other inputs like elevation or spectral indices. This method operates without requiring pre-defined training data, making it useful when field data is limited. The output assigns each pixel to a class, which the user then interprets to potentially identify slash piles based on their distinct spectral signatures and elevated height. While effective for initial classification and pattern recognition, unsupervised methods can produce numerous classes that require manual interpretation and may be less accurate than supervised approaches without ground truth data.
 
@@ -572,7 +571,7 @@ ggplot2::ggsave("../data/pile_tiles_kmeans6.jpeg", height = 10.5, width = 8)
 
 there is no discernible pattern between the kmeans classes and the slash piles because the lighting and conditions around the piles are not consistent. this result also highlights the challenges we'll likely face with pixel-based classification methods
 
-## Supervised classification
+## Pixel-based: supervised classification
 
 we'll start with a pixel-based classification using the image-annotated pile polygons to train a classification model
 
@@ -683,7 +682,7 @@ dplyr::mutate(
 )
 ```
 
-plot our RGB with training piles (white), validation piles(black), pile sample points (red), and non-pile sample points (blue)
+plot our RGB with training piles (white), validation piles (black), pile sample points (red), and non-pile sample points (blue)
 
 ```{r}
 # let's check this out
@@ -985,3 +984,202 @@ ggplot(data =  confusion_matrix_temp, mapping = aes(y = estimate_fact, x = prese
 ```
 
 that's not very good as we could tell from the prediction map
+
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE, include=FALSE}
+remove(list = ls()[grep("_temp",ls())])
+remove(mod_rf, rf_pred_rast, rodmanetal2019_grvi_rast, rodmanetal2019_panchromatic_rast)
+gc()
+```
+
+## Object-based image analysis (OBIA)
+
+OBIA is a technique (or a set of techniques) used to analyze digital images that was developed relatively recently in comparison to ‘classic’ pixel-based image approaches ([Burnett and Blaschke 2003](https://doi.org/10.1016/S0304-3800(03)00139-X)). We will probably implement the OBIA approach using the `SegOptim` [package](https://github.com/joaofgoncalves/SegOptim) presented by [Goncalves et al. (2019)](https://doi.org/10.1016/j.jag.2018.11.011)
+
+We followed [these directions](https://segoptim.bitbucket.io/docs/installation.html#installing-the-package) to install and setup the `SegOptim` [package](https://github.com/joaofgoncalves/SegOptim). A limitation of the `SegOptim` package is that it relies on external software to perform image segmentation because at the time of development R had no 'native' packages for conducting image segmentation. An alternative that does not require 3rd party software and works entirely within the R framework is the `OpenImageR` [package](https://mlampros.github.io/OpenImageR/index.html).
+
+```{r}
+# remotes::install_github("dalpozz/unbalanced")
+# remotes::install_github("joaofgoncalves/SegOptim")
+## !!!!!!!!!!!!!!!! SegOptim also requires external (or 3rd party) software to implement image segmentation
+## !!!!!!!!!!!!!!!! we installed the options available at: https://trac.osgeo.org/osgeo4w/
+## !!!!!!!!!!!!!!!! we installed the options available at: https://www.orfeo-toolbox.org/download/
+library("SegOptim")
+```
+
+### Training data
+
+Training data is described as "typically a single-layer SpatRaster (from terra package) containing samples for training a classifier. The labels, classes or categories should be coded as integers {0,1} for single-class problems or, {1,2,...,n} for multi-class problems." We just have a single-class problem of classification with two mutually exclusive levels: piles and non-piles. Other examples include: species presence/absence, burned/unburned, cut/uncut forest.
+
+first, we'll make a raster covering the entire study area with cells classified based on the pile polygon locations
+
+```{r}
+class_rast <-
+  ortho_rast[[1]] %>% 
+  # terra::subst(from = 0, to = NA) %>% ## 0 values to NA which is specific to this data
+  terra::clamp(lower=0,upper=0) %>% 
+  terra::mask(
+    slash_piles_polys %>% # use ALL piles (image-annotated and field-collected)
+        sf::st_transform(terra::crs(ortho_rast)) %>% 
+        terra::vect()
+    , inverse = T
+    , updatevalue = 1
+  )
+# terra::plot(class_rast)
+```
+
+now we'll make a grid of 0.5 ha to sample from to define our training versus validation areas. we'll implement simple random sampling from this 0.5 ha grid.
+
+after we make the sample area, we'll sample from our classfied raster
+
+```{r, include = F, eval=FALSE}
+# example tutorial: https://segoptim.bitbucket.io/docs/mapping-an-invasive-species-with-object-based-image-analysis.html#input-image-data
+# dl from : https://segoptim.bitbucket.io/docs/data/test_data.zip
+# Change this!!! 
+derp_temp <- "c:/Users/georg/Downloads/SegOptim_test_data"
+
+# Path to raster data used for image segmentation
+# In SEGM_FEAT directory
+inputSegFeat.path <- file.path(derp_temp,"SEGM_FEAT/SegmFeat_WV2_b532.tif")
+seg_temp <- terra::rast(inputSegFeat.path)
+
+# Path to training raster data
+# [0] Non-invaded areas [1] Acacia dealbata invaded areas
+# In TRAIN_AREAS directory
+trainData.path <- file.path(derp_temp,"TRAIN_AREAS/TrainAreas.tif")
+train_temp <- terra::rast(trainData.path)
+terra::plot(train_temp, colNA = "black")
+
+terra::plot(seg_temp[[1]], col = viridis::cividis(n=100))
+terra::plot(train_temp, alpha = 0.3, add = T)
+terra::ext(seg_temp[[1]]) %>% terra::vect() %>% terra::plot(border = "blue", col = NA, lwd = 10)
+terra::ext(train_temp) %>% terra::vect() %>% terra::plot(border = "red", col = NA, lwd = 6, add = T)
+# Path to raster data used as classification features
+# In CLASSIF_FEAT directory
+classificationFeatures.path <- c(file.path(derp_temp,"CLASSIF_FEAT/ClassifFeat_WV2_NDIs.tif"),
+                                 file.path(derp_temp,"CLASSIF_FEAT/ClassifFeat_WV2_SpectralBands.tif"))
+terra::rast(classificationFeatures.path[1])[[1]] %>% terra::ext() %>% terra::vect() %>% terra::plot(border = "orange", col = NA, lwd = 4, add = T)
+terra::rast(classificationFeatures.path[2])[[1]] %>% terra::ext() %>% terra::vect() %>% terra::plot(border = "gray", col = NA, lwd = 2, add = T)
+
+
+seg_temp %>% terra::plotRGB(stretch = "hist", colNA = "transparent")
+terra::rast(classificationFeatures.path[1]) %>% names()
+terra::rast(classificationFeatures.path[2]) %>% names()
+terra::rast(classificationFeatures.path[2]) %>%
+  terra::plotRGB(r = 1, g = 2, b = 3, stretch = "hist", colNA = "transparent")
+
+# all of this has taught me that: 
+# 1) the Training data (0/1 raster), Segmentation features (raster stack), and Classification features (raster stack) all cover the same area
+# 2) the Training data (0/1 raster) is NA in areas not sampled... since our entire area is "sampled" we'll try to NA the validation areas
+
+### Goncalves et al. (2019) describe 
+    # The segmentation feature space: encompassed less dimensions (in comparison to the classification feature space) to allow fast processing needed to run segmentation. For example, the Red (R), Green (G) and Blue (B) bands were employed
+    # Classification features were many: (a) spectral bands (reflectance values); (b) alternative colour spaces (other than RGB but with better separability between components; e.g., XYZ, YUV); (c) multiple combinations of band ratios in the form: where and are any two different spectral bands; (d) vegetation and/or water indices (e.g., NDVI, EVI, NDWI); (e) multiple combinations of Normalized Difference Indices (NDI) in the form ; (f) texture operators such as Haralick (Haralick, 1979) (HL; e.g., energy, entropy, correlation, inertia), Local Statistics (LS; e.g., mean, variance)
+```
+
+```{r}
+# generates the grid
+sample_grid <- ortho_rast[[1]] %>% 
+  terra::clamp(lower=0,upper=0) %>% 
+  terra::aggregate(fact = sqrt(10000*0.5)/terra::res(ortho_rast[[1]])[1])
+# determins training tiles from the grid
+set.seed(44)
+sample_grid <-
+  terra::init(sample_grid, "cell") %>% 
+  terra::subst(
+    from = sample(1:terra::ncell(sample_grid), size = floor(terra::ncell(sample_grid)*0.7))
+    , to = 1
+    , others = NA
+  )
+# terra::plot(sample_grid) # emmental
+# sample from the classified raster
+class_rast_training <-
+  class_rast %>% 
+    terra::mask(terra::as.polygons(sample_grid))
+```
+
+check out the area we'll use for training with the area for validation dimmed
+
+```{r}
+terra::plot(class_rast_training)
+terra::plot(class_rast, alpha = 0.2, add = T, axes=F, legend = F)
+```
+
+### `OpenImageR` package SLIC clustering
+
+the `OpenImageR` [package](https://github.com/mlampros/OpenImageR) makes the Simple Linear Iterative Clustering (SLIC) clustering algorithm ([Ren & Malik 2003](https://scholar.google.com/scholar?cluster=8327809513720180304&hl=en&as_sdt=0,6)) available in R
+
+```{r}
+# the e1071 package is a popular choice for SVM implementation in R, providing a straightforward interface for training and evaluation.
+# remotes::install_github('mlampros/OpenImageR')
+# remotes::install_github('mlampros/SuperpixelImageSegmentation')
+library("OpenImageR")
+library("SuperpixelImageSegmentation")
+# list.files(system.file("tmp_images", package = "OpenImageR"))
+
+tempdir_temp <- tempdir()
+# fpath_train <- file.path(tempdir_temp, "train.tif")
+# fpath_seg <- file.path(tempdir_temp, "seg.tif")
+fpath_class <- file.path(tempdir_temp, "class.tif")
+# write
+# terra::writeRaster(class_rast_training, filename = fpath_train, overwrite = T)
+# terra::writeRaster(
+#   pred_rast %>% terra::subset(c("red","green","blue"))
+#   , filename = fpath_seg
+#   , overwrite = T
+# )
+terra::writeRaster(
+  pred_rast # includes indicies and textural as well as RGB
+  , filename = fpath_class
+  , overwrite = T
+)
+
+######
+# read image()
+im_temp <- OpenImageR::readImage(fpath_class)
+#--------------
+# "slic" method
+#--------------
+fpath_class
+res_slic = OpenImageR::superpixels(input_image = im_temp,
+                       method = "slic",
+                       superpixel = 200, 
+                       compactness = 20,
+                       return_slic_data = TRUE,
+                       return_labels = TRUE, 
+                       write_slic = "", 
+                       verbose = TRUE)
+
+str(res_slic)
+
+OpenImageR::NormalizeObject(res_slic$slic_data) %>% 
+  terra::rast() %>% 
+  terra::subset(3) %>% 
+  terra::plot()
+
+plot_slic = OpenImageR::NormalizeObject(res_slic$slic_data)
+plot_slic = grDevices::as.raster(plot_slic)
+graphics::plot(plot_slic)
+
+
+
+#---------------
+# "slico" method       [ the "slico" method does not require the "compactness" parameter ]
+#---------------
+
+res_slico = superpixels(input_image = im,
+                        method = "slico",
+                        superpixel = 200, 
+                        return_slic_data = TRUE,
+                        return_labels = TRUE, 
+                        write_slic = "", 
+                        verbose = TRUE)
+
+str(res_slico)
+
+List of 2
+ $ slic_data: num [1:360, 1:360, 1:3] 255 255 255 255 255 255 255 255 255 255 ...
+ $ labels   : num [1:360, 1:360] 0 0 0 0 0 0 0 0 0 0 ...
+```
+
+
