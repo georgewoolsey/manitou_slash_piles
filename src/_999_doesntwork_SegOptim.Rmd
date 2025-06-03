@@ -1,3 +1,13 @@
+We followed [these directions](https://segoptim.bitbucket.io/docs/installation.html#installing-the-package) to install and setup the `SegOptim` [package](https://github.com/joaofgoncalves/SegOptim). A limitation of the `SegOptim` package is that it relies on external software to perform image segmentation because at the time of development R had no 'native' packages for conducting image segmentation. 
+
+```{r}
+# remotes::install_github("dalpozz/unbalanced")
+# remotes::install_github("joaofgoncalves/SegOptim")
+## !!!!!!!!!!!!!!!! SegOptim also requires external (or 3rd party) software to implement image segmentation
+## !!!!!!!!!!!!!!!! we installed the options available at: https://trac.osgeo.org/osgeo4w/
+## !!!!!!!!!!!!!!!! we installed the options available at: https://www.orfeo-toolbox.org/download/
+library("SegOptim")
+```
 
 ## `SegOptim` segmentation
 

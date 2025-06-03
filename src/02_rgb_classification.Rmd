@@ -985,7 +985,6 @@ ggplot(data =  confusion_matrix_temp, mapping = aes(y = estimate_fact, x = prese
 
 that's not very good as we could tell from the prediction map
 
-
 ```{r, warning=FALSE, message=FALSE, echo=FALSE, include=FALSE}
 remove(list = ls()[grep("_temp",ls())])
 remove(mod_rf, rf_pred_rast, rodmanetal2019_grvi_rast, rodmanetal2019_panchromatic_rast)
@@ -996,16 +995,7 @@ gc()
 
 OBIA is a technique (or a set of techniques) used to analyze digital images that was developed relatively recently in comparison to ‘classic’ pixel-based image approaches ([Burnett and Blaschke 2003](https://doi.org/10.1016/S0304-3800(03)00139-X)). We will probably implement the OBIA approach using the `SegOptim` [package](https://github.com/joaofgoncalves/SegOptim) presented by [Goncalves et al. (2019)](https://doi.org/10.1016/j.jag.2018.11.011)
 
-We followed [these directions](https://segoptim.bitbucket.io/docs/installation.html#installing-the-package) to install and setup the `SegOptim` [package](https://github.com/joaofgoncalves/SegOptim). A limitation of the `SegOptim` package is that it relies on external software to perform image segmentation because at the time of development R had no 'native' packages for conducting image segmentation. An alternative that does not require 3rd party software and works entirely within the R framework is the `OpenImageR` [package](https://mlampros.github.io/OpenImageR/index.html).
-
-```{r}
-# remotes::install_github("dalpozz/unbalanced")
-# remotes::install_github("joaofgoncalves/SegOptim")
-## !!!!!!!!!!!!!!!! SegOptim also requires external (or 3rd party) software to implement image segmentation
-## !!!!!!!!!!!!!!!! we installed the options available at: https://trac.osgeo.org/osgeo4w/
-## !!!!!!!!!!!!!!!! we installed the options available at: https://www.orfeo-toolbox.org/download/
-library("SegOptim")
-```
+An alternative that does not require 3rd party software and works entirely within the R framework is the `OpenImageR` [package](https://mlampros.github.io/OpenImageR/index.html).
 
 ### Training data
 
@@ -1028,7 +1018,7 @@ class_rast <-
 # terra::plot(class_rast)
 ```
 
-now we'll make a grid of 0.5 ha to sample from to define our training versus validation areas. we'll implement simple random sampling from this 0.5 ha grid.
+now we'll make a grid of 0.25 ha to sample from to define our training versus validation areas. we'll implement simple random sampling from this 0.25 ha grid.
 
 after we make the sample area, we'll sample from our classfied raster
 
@@ -1081,9 +1071,9 @@ terra::rast(classificationFeatures.path[2]) %>%
 # generates the grid
 sample_grid <- ortho_rast[[1]] %>% 
   terra::clamp(lower=0,upper=0) %>% 
-  terra::aggregate(fact = sqrt(10000*0.5)/terra::res(ortho_rast[[1]])[1])
+  terra::aggregate(fact = sqrt(10000*0.25)/terra::res(ortho_rast[[1]])[1])
 # determins training tiles from the grid
-set.seed(44)
+set.seed(66)
 sample_grid <-
   terra::init(sample_grid, "cell") %>% 
   terra::subst(
@@ -1107,7 +1097,7 @@ terra::plot(class_rast, alpha = 0.2, add = T, axes=F, legend = F)
 
 ### `OpenImageR` package SLIC clustering
 
-the `OpenImageR` [package](https://github.com/mlampros/OpenImageR) makes the Simple Linear Iterative Clustering (SLIC) clustering algorithm ([Ren & Malik 2003](https://scholar.google.com/scholar?cluster=8327809513720180304&hl=en&as_sdt=0,6)) available in R
+the `OpenImageR` [package](https://github.com/mlampros/OpenImageR) makes the Simple Linear Iterative Clustering (SLIC) clustering algorithm ([Achanta et al. 2012](https://scholar.google.com/scholar?cluster=2726314889973535954&hl=en&as_sdt=0,6)) available in R
 
 ```{r}
 # the e1071 package is a popular choice for SVM implementation in R, providing a straightforward interface for training and evaluation.
@@ -1116,70 +1106,231 @@ the `OpenImageR` [package](https://github.com/mlampros/OpenImageR) makes the Sim
 library("OpenImageR")
 library("SuperpixelImageSegmentation")
 # list.files(system.file("tmp_images", package = "OpenImageR"))
+# system.file("tmp_images", "slic_im.png", package = "OpenImageR") %>% 
+#   terra::rast() %>% 
+#   # terra::subset(1) %>% 
+#   # terra::plot()
+#   terra::plotRGB()
 
+#### save files to disk as required by package
 tempdir_temp <- tempdir()
-# fpath_train <- file.path(tempdir_temp, "train.tif")
-# fpath_seg <- file.path(tempdir_temp, "seg.tif")
+fpath_train <- file.path(tempdir_temp, "train.tif")
+fpath_seg <- file.path(tempdir_temp, "seg.tif")
 fpath_class <- file.path(tempdir_temp, "class.tif")
 # write
-# terra::writeRaster(class_rast_training, filename = fpath_train, overwrite = T)
-# terra::writeRaster(
-#   pred_rast %>% terra::subset(c("red","green","blue"))
-#   , filename = fpath_seg
-#   , overwrite = T
-# )
+terra::writeRaster(class_rast_training, filename = fpath_train, overwrite = T)
+terra::writeRaster(
+  pred_rast %>% terra::subset(c("red","green","blue"))
+  , filename = fpath_seg
+  , overwrite = T
+)
 terra::writeRaster(
   pred_rast # includes indicies and textural as well as RGB
   , filename = fpath_class
   , overwrite = T
 )
+```
 
-######
-# read image()
-im_temp <- OpenImageR::readImage(fpath_class)
+we'll implement the SLICO variation of SLIC because the user does not need to define the compactness parameter or try different values of it. SLICO adaptively chooses the compactness parameter for each superpixel differently. This generates regular shaped superpixels in both textured and non textured regions alike. The improvement comes with hardly any compromise on the computational efficiency - SLICO continues to be as fast as SLIC ([**How is SLICO different from SLIC?**](https://www.epfl.ch/labs/ivrl/research/slic-superpixels/#SLICO))
+
+```{r}
 #--------------
 # "slic" method
 #--------------
-fpath_class
-res_slic = OpenImageR::superpixels(input_image = im_temp,
-                       method = "slic",
-                       superpixel = 200, 
-                       compactness = 20,
-                       return_slic_data = TRUE,
-                       return_labels = TRUE, 
-                       write_slic = "", 
-                       verbose = TRUE)
+# readImage on our RGB raster for segmentation
+im_temp <- OpenImageR::readImage(fpath_seg)
+# str(im_temp)
 
-str(res_slic)
+## number of superpixels to use
+## set this to extent/minimum expected pile area?
+sp_temp <- floor(
+    # raster area
+    ( terra::cellSize(ortho_rast[[1]])[1]*terra::ncell(ortho_rast[[1]]) ) / 
+    # expected pile area
+      (
+        slash_piles_polys %>% dplyr::mutate(area = sf::st_area(.) %>% as.numeric()) %>% 
+        dplyr::pull(area) %>% 
+        quantile(probs = 0.95)
+      )
+  ) %>% 
+  max(200) # 200 = function default
 
-OpenImageR::NormalizeObject(res_slic$slic_data) %>% 
-  terra::rast() %>% 
-  terra::subset(3) %>% 
-  terra::plot()
-
-plot_slic = OpenImageR::NormalizeObject(res_slic$slic_data)
-plot_slic = grDevices::as.raster(plot_slic)
-graphics::plot(plot_slic)
-
-
-
-#---------------
-# "slico" method       [ the "slico" method does not require the "compactness" parameter ]
-#---------------
-
-res_slico = superpixels(input_image = im,
-                        method = "slico",
-                        superpixel = 200, 
-                        return_slic_data = TRUE,
-                        return_labels = TRUE, 
-                        write_slic = "", 
-                        verbose = TRUE)
-
-str(res_slico)
-
-List of 2
- $ slic_data: num [1:360, 1:360, 1:3] 255 255 255 255 255 255 255 255 255 255 ...
- $ labels   : num [1:360, 1:360] 0 0 0 0 0 0 0 0 0 0 ...
+# superpixels
+superpixels_slico_ans <- OpenImageR::superpixels(
+  input_image = im_temp
+  # Either "slic" or "slico"
+  , method = "slico" 
+  # number of superpixels to use
+  , superpixel = sp_temp
+  # numeric value specifying the compactness parameter. 
+    # The compactness parameter is needed only if method is "slic". The "slico" method adaptively chooses
+    # the compactness parameter for each superpixel differently
+  # , compactness = 20 
+  # If TRUE then the resulted slic or slico data will be returned
+  , return_slic_data = TRUE
+  # If TRUE then the Lab data will be returned ( the Lab-colour format )
+  , return_labels = TRUE
+  # If not an empty string ("") then it should be a path to the output file with extension .bin 
+  , write_slic = ""
+  , verbose = TRUE
+)
 ```
 
+what did we get back?
+
+```{r}
+str(superpixels_slico_ans)
+# superpixels_slico_ans$labels %>% length()
+# superpixels_slico_ans$labels %>% unique() %>% length()
+# superpixels_slico_ans$labels %>% dplyr::as_tibble() %>% ncol()
+# superpixels_slico_ans$labels %>% dplyr::as_tibble() %>% nrow()
+# superpixels_slico_ans$slic_data %>% str()
+```
+
+let's look at the superpixels overlaid on the RGB image
+
+```{r}
+# OpenImageR::NormalizeObject = normalize a vector, matrix or array (in the range between 0 and 1)
+OpenImageR::NormalizeObject(superpixels_slico_ans$slic_data) %>% 
+  terra::rast() %>% 
+  terra::subset(1:3) %>% 
+  terra::plotRGB(stretch = "lin", colNA = "black")
+
+# OpenImageR::NormalizeObject(superpixels_slico_ans$slic_data) %>% 
+#   grDevices::as.raster() %>% 
+#   graphics::plot()
+```
+
+that's neat...generally, the steps in image segmentation would be:
+
+1. Image Segmentation (e.g. using SLIC) as demonstrated above
+2. Feature Extraction for Superpixels: instead of using individual pixel values, extract features that describe each superpixel (e.g. spectral bands, band ratios, textural features)
+3. Use labeled training data to assign superpixels to their respective classes and perform classifier training (i.e. using random forest, support vector machines, etc.)
+4. Once the classifier is trained, you apply it to the features of all the unlabeled superpixels in the image
+
+### `SuperpixelImageSegmentation` package SLICAP clustering
+
+we'll test out the `SuperpixelImageSegmentation` [package](https://github.com/mlampros/SuperpixelImageSegmentation) which was developed specifically to implement the SLIC Superpixels and Affinity Propagation (AP) Clustering method of image segmentation ([Zhou 2015](https://www.ijsr.net/archive/v4i4/SUB152869.pdf)). This method first uses the SLIC superpixel algorithm to form an over-segmentation of an image, constructs a similarity score based on the features of superpixels, and uses the AP algorithm to cluster superpixels. All of these steps are performed in a semi-automated manner as the user does not need to specify the number of clusters as required by other methods (e.g. Kmeans). 
+
+```{r}
+# readImage on our RGB raster for segmentation
+im_temp <- OpenImageR::readImage(fpath_seg)
+# initiate and perform segmentation of images based on superpixels, affinity propagation and kmeans clustering
+init <- SuperpixelImageSegmentation::Image_Segmentation$new()
+superpixels_slicap_ans <- init$spixel_segmentation(
+  input_image = im_temp
+  # a numeric value specifying the number of superpixels
+  , superpixel = 600
+  # a character string specifying the kmeans method. If not empty ("") then it can be either "kmeans" or "mini_batch_kmeans"
+  , kmeans_method = ""
+  # If TRUE then the affinity propagation image data will be computed and returned
+  , AP_data = TRUE
+  # If TRUE then the median will be used rather than the mean value for the inner computations (see the details section for more information)
+  , use_median = TRUE
+  # a numeric value specifying the weight for the "L" channel of the image (the weights of the three channels based on the "CIELAB color space")
+  , sim_wL = 3
+  # a numeric value specifying the weight for the "A" channel of the image (the weights of the three channels based on the "CIELAB color space")
+  , sim_wA = 10
+  # a numeric value specifying the weight for the "B" channel of the image (the weights of the three channels based on the "CIELAB color space")
+  , sim_wB = 10
+  # numeric value specifying the colorradius: 
+    ## adjusts the number of clusters, and if its value is low, the number of targets would increase, which leads to more detailed segmentation results
+  , sim_color_radius = 10
+  , verbose = TRUE
+)
+```
+
+what did we get back?
+
+```{r}
+str(superpixels_slicap_ans)
+```
+
+let's see the output based on **Superpixels + AP**
+
+```{r}
+OpenImageR::imageShow(superpixels_slicap_ans$AP_image_data)
+```
+
+ok, let's increase the number of superpixels to get finer detail (but significantly increase processing time)
+
+```{r}
+# readImage on our RGB raster for segmentation
+im_temp <- OpenImageR::readImage(fpath_seg)
+# initiate and perform segmentation of images based on superpixels, affinity propagation and kmeans clustering
+init <- SuperpixelImageSegmentation::Image_Segmentation$new()
+superpixels_slicap_ans <- init$spixel_segmentation(
+  input_image = im_temp
+  # a numeric value specifying the number of superpixels
+  , superpixel = 1200
+  # a character string specifying the kmeans method. If not empty ("") then it can be either "kmeans" or "mini_batch_kmeans"
+  , kmeans_method = ""
+  # If TRUE then the affinity propagation image data will be computed and returned
+  , AP_data = TRUE
+  # If TRUE then the median will be used rather than the mean value for the inner computations (see the details section for more information)
+  , use_median = TRUE
+  # a numeric value specifying the weight for the "L" channel of the image (the weights of the three channels based on the "CIELAB color space")
+  , sim_wL = 3
+  # a numeric value specifying the weight for the "A" channel of the image (the weights of the three channels based on the "CIELAB color space")
+  , sim_wA = 10
+  # a numeric value specifying the weight for the "B" channel of the image (the weights of the three channels based on the "CIELAB color space")
+  , sim_wB = 10
+  # numeric value specifying the colorradius: 
+    ## adjusts the number of clusters, and if its value is low, the number of targets would increase, which leads to more detailed segmentation results
+  , sim_color_radius = 10
+  , verbose = TRUE
+)
+```
+
+let's see the output based on **Superpixels + AP** and we'll add the pile outlines in blue
+
+```{r}
+superpixels_slicap_ans %>% str()
+rast_temp <- ortho_rast %>% terra::subset(1)
+rast_temp[] <- superpixels_slicap_ans$AP_image_data[,,1] %>% terra::rast()
+rast_temp$green <- ortho_rast %>% terra::subset(1)
+rast_temp$green[] <- superpixels_slicap_ans$AP_image_data[,,2] %>% terra::rast()
+rast_temp$blue <- ortho_rast %>% terra::subset(1)
+rast_temp$blue[] <- superpixels_slicap_ans$AP_image_data[,,2] %>% terra::rast()
+# rast_temp %>% terra::crs()
+# rast_temp %>% terra::plot()
+rast_temp %>% 
+  terra::subset(1:3) %>% 
+  terra::plotRGB(stretch = "lin", colNA = "black")
+terra::plot(
+  slash_piles_polys %>% 
+    sf::st_transform(terra::crs(ortho_rast)) %>% terra::vect()
+  , add = T, border = "blue", col = NA, lwd = 1.2
+)
+```
+
+#### Kmeans to automatically determine clusters
+
+one might take advantage of the automatic way the AP algorithm determines the number of clusters in order to perform vector quantization using kmeans (this will give qualitative better results at the cost of increasing computation time). I included additional parameters in the spixel_segmentation() method of the Image_Segmentation R6-class for this purpose
+
+```{r}
+
+superpixels_slicap_ans <- init$spixel_segmentation(
+  input_image = im_km
+  superpixel = 600
+  AP_data = TRUE
+  use_median = TRUE
+  sim_wL = 3
+  sim_wA = 10
+  sim_wB = 10
+  sim_color_radius = 10
+  kmeans_method = "kmeans"
+  kmeans_initializer = "kmeans++"
+  kmeans_num_init = 3
+  kmeans_max_iters = 100
+  verbose = TRUE
+)
+
+```
+
+The following image shows the output based on **Superpixels + AP**
+
+```{r}
+
+```
 
