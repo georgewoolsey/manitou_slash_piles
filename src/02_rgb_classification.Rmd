@@ -2,7 +2,7 @@
 
 We'll use the RGB imagery alone to explore unsupervised and supervised classification algorithms.
 
-Ultimately, it is likely we will use an object-based image analysis (OBIA) approach. OBIA is a technique (or a set of techniques) used to analyze digital images that was developed relatively recently in comparison to ‘classic’ pixel-based image approaches ([Burnett and Blaschke 2003](https://doi.org/10.1016/S0304-3800(03)00139-X)). We will probably implement the OBIA approach using the `SegOptim` [package](https://github.com/joaofgoncalves/SegOptim) presented by [Goncalves et al. (2019)](https://doi.org/10.1016/j.jag.2018.11.011)
+Ultimately, it is likely we will use an object-based image analysis (OBIA) approach. OBIA is a technique (or a set of techniques) used to analyze digital images that was developed relatively recently in comparison to ‘classic’ pixel-based image approaches ([Burnett and Blaschke 2003](https://doi.org/10.1016/S0304-3800(03)00139-X)). The OBIA approach for ecological applications is described by [Goncalves et al. (2019)](https://doi.org/10.1016/j.jag.2018.11.011) who also introduce the `SegOptim` [package](https://github.com/joaofgoncalves/SegOptim)
 
 In future sections we will explore, integration of spectral data with the 3D point cloud data (i.e. "data fusion") to test distinguishing the woody material in slash piles from surrounding vegetation or soil. Field-measured slash piles will be used as the ground truth data to perform a confusion matrix-based validation accuracy assessment of the methods.
 
@@ -340,13 +340,27 @@ patchwork::wrap_plots(
 ggplot2::ggsave("../data/pile_tiles_texture.jpeg", height = 10.5, width = 5)
 ```
 
-## Pixel-based: unsupervised classification
+### Features for classification
 
-Unsupervised image classification could be used to identify slash piles by grouping pixels with similar spectral characteristics. We'll call any method that implements classification at the pixel level like the unsupervised classification approach tested here "pixel-based image analysis" versus to OBIA. Unsupervised image classification uses algorithms like K-means to find natural clusters within spectral data and can use other inputs like elevation or spectral indices. This method operates without requiring pre-defined training data, making it useful when field data is limited. The output assigns each pixel to a class, which the user then interprets to potentially identify slash piles based on their distinct spectral signatures and elevated height. While effective for initial classification and pattern recognition, unsupervised methods can produce numerous classes that require manual interpretation and may be less accurate than supervised approaches without ground truth data.
+[Goncalves et al. (2019)](https://doi.org/10.1016/j.jag.2018.11.011) describe the general workflow of the OBIA approach for ecological applications based on Genetic Algorithms (GA) to optimize image segmentation parameters:
 
-let's test it out and see what we get
+1. Run the image segmentation: involves the partitioning of an image into a set of jointly exhaustive and mutually disjoint regions (a.k.a. segments, composed by multiple image pixels) that are internally more homogeneous and similar compared to adjacent ones;
+    + segmentation algorithms include: mean-shift; region growing; SNIC (Simple Non-iterative Clustering) and SLIC (Simple Linear Iterative Clustering)
+2. Load training data into the segmented image;
+3. Calculate segment statistics (e.g., mean, standard-deviation) for classification features;
+4. Merge training and segment statistics data (steps 2-3);
+5. Do train/test data partitions (e.g., 5-fold cross-validation);
+6. For each train/test set:
+    6.1. Train the supervised classifier;
+    6.2. Evaluate results for the test set;
+7. Return the average evaluation score across all train/test rounds (fitness value);
 
-first, we'll convert our rasters to a data frame
+where: 
+
+* Segmentation features (step 1): a multi-layer raster dataset with features used only for the segmentation stage (e.g., spectral bands)
+* Classification features (step 3): a multi-layer raster dataset with features used for classification (e.g., spectral data, band ratios, spectral vegetation indices, texture features, topographic data).
+
+let's combine our rasters into a raster stack and generate a data frame with individual cells as rows and covariates as columns
 
 ```{r}
 #rename composites
@@ -367,7 +381,7 @@ pred_rast <- c(
 check out correlations between covariates
 
 ```{r}
-# investigate correlation among environmental covariates
+# investigate correlation among covariates
 pred_rast %>% 
   terra::pairs(
     maxcells = min(7777, terra::ncell(pred_rast)*.01)
@@ -399,7 +413,7 @@ pred_df %>%
   geom_smooth(se=F, method = "lm")
 ```
 
-the panchromatic band itself doesn't add much new information, let's remove it and generate a data frame for training kmeans clustering
+the panchromatic band itself doesn't add much new information, let's remove it and generate a data frame for training our clustering algorithms
 
 ```{r}
 # remove correlated layers
@@ -424,7 +438,11 @@ pred_df <- terra::as.data.frame(
 pred_df %>% dplyr::slice_sample(n=100) %>% dplyr::glimpse()
 ```
 
-perform kmeans clustering
+## Pixel-based: unsupervised classification
+
+Unsupervised image classification could be used to identify slash piles by grouping pixels with similar spectral characteristics. We'll call any method that implements classification at the pixel level like the unsupervised classification approach tested here "pixel-based image analysis" versus to OBIA. Unsupervised image classification uses algorithms like K-means to find natural clusters within spectral data and can use other inputs like elevation or spectral indices. This method operates without requiring pre-defined training data, making it useful when field data is limited. The output assigns each pixel to a class, which the user then interprets to potentially identify slash piles based on their distinct spectral signatures and elevated height. While effective for initial classification and pattern recognition, unsupervised methods can produce numerous classes that require manual interpretation and may be less accurate than supervised approaches without ground truth data.
+
+let's test out kmeans clustering and see what we get
 
 ```{r}
 set.seed(111)
@@ -1095,9 +1113,9 @@ terra::plot(class_rast_training)
 terra::plot(class_rast, alpha = 0.2, add = T, axes=F, legend = F)
 ```
 
-### `OpenImageR` package SLIC clustering
+### `OpenImageR` package SLIC image segmentation{#slic}
 
-the `OpenImageR` [package](https://github.com/mlampros/OpenImageR) makes the Simple Linear Iterative Clustering (SLIC) clustering algorithm ([Achanta et al. 2012](https://scholar.google.com/scholar?cluster=2726314889973535954&hl=en&as_sdt=0,6)) available in R
+the `OpenImageR` [package](https://github.com/mlampros/OpenImageR) makes the Simple Linear Iterative Clustering (SLIC) clustering algorithm ([Achanta et al. 2012](https://scholar.google.com/scholar?cluster=2726314889973535954&hl=en&as_sdt=0,6)) available in R. SLIC takes an image and segments it into "superpixels." These superpixels are compact, nearly uniform regions that adhere well to image boundaries. The key idea is that within a superpixel, pixels are likely to belong to the same object or land cover type. This is a crucial first step because subsequent classification will be performed on these superpixels, not individual pixels.
 
 ```{r}
 # the e1071 package is a popular choice for SVM implementation in R, providing a straightforward interface for training and evaluation.
@@ -1135,7 +1153,7 @@ we'll implement the SLICO variation of SLIC because the user does not need to de
 
 ```{r}
 #--------------
-# "slic" method
+# "slico" method
 #--------------
 # readImage on our RGB raster for segmentation
 im_temp <- OpenImageR::readImage(fpath_seg)
@@ -1187,21 +1205,46 @@ str(superpixels_slico_ans)
 # superpixels_slico_ans$slic_data %>% str()
 ```
 
-let's look at the superpixels overlaid on the RGB image
+let's put the superpixels into a raster
 
 ```{r}
-# OpenImageR::NormalizeObject = normalize a vector, matrix or array (in the range between 0 and 1)
-OpenImageR::NormalizeObject(superpixels_slico_ans$slic_data) %>% 
-  terra::rast() %>% 
-  terra::subset(1:3) %>% 
-  terra::plotRGB(stretch = "lin", colNA = "black")
+# use the ortho template so we get the projection and then fill with values
+superpixels_slico_rast <- ortho_rast %>% terra::subset(1)
+# fill raster with the superpixels
+superpixels_slico_rast[] <- superpixels_slico_ans$labels %>% terra::rast()
+superpixels_slico_rast <- terra::as.factor(superpixels_slico_rast)
+# reset the colors
+terra::coltab(superpixels_slico_rast) <- data.frame(
+  value = terra::minmax(superpixels_slico_rast)[1]:terra::minmax(superpixels_slico_rast)[2]
+  , col = c(
+    viridis::turbo(terra::unique(superpixels_slico_rast) %>% nrow() %>% `*`(1/3) %>% ceiling(), alpha = 0.35)
+    , viridis::viridis(terra::unique(superpixels_slico_rast) %>% nrow() %>% `*`(1/3) %>% ceiling(), alpha = 0.35)
+    , viridis::cividis(terra::unique(superpixels_slico_rast) %>% nrow() %>% `*`(1/3) %>% ceiling(), alpha = 0.35)
+  ) %>% 
+    sample(size = (terra::unique(superpixels_slico_rast) %>% nrow()))
+)
+# # plot
+# superpixels_slico_rast %>% terra::plot(legend = F, axes = F)
+```
 
+let's look at the superpixels overlaid on the RGB image with the slash pile locations (blue)
+
+```{r}
+terra::plotRGB(ortho_rast, stretch = "lin", colNA = "black")
+terra::plot(superpixels_slico_rast, add = T, alpha = 0.2, border = "white")
+# add polys
+terra::plot(
+  slash_piles_polys %>% sf::st_transform(terra::crs(ortho_rast)) %>% terra::vect()
+  , add = T, border = "blue", col = NA
+)
 # OpenImageR::NormalizeObject(superpixels_slico_ans$slic_data) %>% 
 #   grDevices::as.raster() %>% 
 #   graphics::plot()
 ```
 
-that's neat...generally, the steps in image segmentation would be:
+that's neat, the superpixels are moderately aligned with the large machine piles but are generally too large for the smaller hand piles
+
+the steps in the OBIA approach workflow described by [Goncalves et al. (2019)](https://doi.org/10.1016/j.jag.2018.11.011) would be:
 
 1. Image Segmentation (e.g. using SLIC) as demonstrated above
 2. Feature Extraction for Superpixels: instead of using individual pixel values, extract features that describe each superpixel (e.g. spectral bands, band ratios, textural features)
@@ -1221,6 +1264,8 @@ superpixels_slicap_ans <- init$spixel_segmentation(
   input_image = im_temp
   # a numeric value specifying the number of superpixels
   , superpixel = 600
+  # Either "slic" or "slico"
+  , method = "slico"
   # a character string specifying the kmeans method. If not empty ("") then it can be either "kmeans" or "mini_batch_kmeans"
   , kmeans_method = ""
   # If TRUE then the affinity propagation image data will be computed and returned
@@ -1263,6 +1308,8 @@ superpixels_slicap_ans <- init$spixel_segmentation(
   input_image = im_temp
   # a numeric value specifying the number of superpixels
   , superpixel = sp_temp # 3333
+  # Either "slic" or "slico"
+  , method = "slico"
   # a character string specifying the kmeans method. If not empty ("") then it can be either "kmeans" or "mini_batch_kmeans"
   , kmeans_method = ""
   # If TRUE then the affinity propagation image data will be computed and returned
@@ -1277,7 +1324,7 @@ superpixels_slicap_ans <- init$spixel_segmentation(
   , sim_wB = 10
   # numeric value specifying the colorradius: 
     ## adjusts the number of clusters, and if its value is low, the number of targets would increase, which leads to more detailed segmentation results
-  , sim_color_radius = 3
+  , sim_color_radius = 2
   , verbose = TRUE
 )
 ```
@@ -1308,12 +1355,11 @@ rast_temp <- terra::subst(
 # rast_temp %>% terra::plot()
 # reset the colors
 terra::coltab(rast_temp) <- data.frame(
-  value = 1:(terra::unique(rast_temp) %>% nrow())
+  value = terra::minmax(rast_temp)[1]:terra::minmax(rast_temp)[2]
   , col = viridis::turbo(terra::unique(rast_temp) %>% nrow(), alpha = 0.9)
 )
 # plot
-rast_temp %>% 
-  terra::plot(colNA = "black", axes=F)
+terra::plot(rast_temp, colNA = "black", axes=F)
 terra::plot(
   slash_piles_polys %>% 
     sf::st_transform(terra::crs(ortho_rast)) %>% terra::vect()
@@ -1321,10 +1367,10 @@ terra::plot(
 )
 ```
 
-it looks like the automatic clustering did not consistently classify the pile locations
+it looks like the automatic clustering did not consistently classify the pile locations. let's check the distribution of the clusters within the pile locations
 
 ```{r}
-rast_temp %>% 
+tab_temp <- rast_temp %>% 
   terra::extract(
     slash_piles_polys %>% 
       sf::st_transform(terra::crs(ortho_rast)) %>% terra::vect()
@@ -1332,10 +1378,30 @@ rast_temp %>%
   ) %>% 
   dplyr::rename(cluster = 1) %>% 
   dplyr::count(cluster) %>% 
-  dplyr::mutate(pct = scales::percent(n/sum(n))) %>% 
-  dplyr::arrange(desc(n))
+  dplyr::mutate(pct = n/sum(n)) %>% 
+  dplyr::arrange(desc(n)) 
+# table
+tab_temp %>% 
+  dplyr::select(-n) %>% 
+  dplyr::mutate(pct = scales::percent(pct,accuracy=0.1)) %>% 
+  kableExtra::kbl(
+    col.names = c("cluster","pct of clusters<br>that overlap with a pile")
+    , escape = F
+  ) %>% 
+  kableExtra::kable_styling()
+```
+
+we can see this if we look at only the clusters that overlap with at least 10% of the piles
+
+```{r}
 ### 
-terra::subst(rast_temp, from = c(14,15,13,19), to = 1, others = NA) %>% terra::plot(axes = F, legend = F)
+terra::subst(
+  rast_temp
+  , from = tab_temp %>% dplyr::filter(pct>=0.1) %>% dplyr::pull(cluster) %>% as.numeric()
+  , to = tab_temp %>% dplyr::filter(pct>=0.1) %>% dplyr::pull(cluster) %>% as.numeric()
+  , others = NA
+) %>% 
+  terra::plot(axes = F)
 terra::plot(
   slash_piles_polys %>% 
     sf::st_transform(terra::crs(ortho_rast)) %>% terra::vect()
@@ -1343,34 +1409,217 @@ terra::plot(
 )
 ```
 
+this testing indicated that clustering based on **Superpixels + AP** will likely not work for our problem to detect slash piles in imagery because the output is not granular enough
 
 #### Kmeans to automatically determine clusters
 
-one might take advantage of the automatic way the AP algorithm determines the number of clusters in order to perform vector quantization using kmeans (this will give qualitative better results at the cost of increasing computation time). I included additional parameters in the spixel_segmentation() method of the Image_Segmentation R6-class for this purpose
+one might take advantage of the automatic way the AP algorithm determines the number of clusters in order to perform vector quantization using kmeans (this will give qualitative better results at the cost of increasing computation time). the advantage of using Superpixels + AP + Kmeans (or Mini-Batch-Kmeans, which can decrease the computation time at the cost of a reduced image quality) lies in the fact that the user does not have to specify the number of clusters beforehand
+
+to do this, we update the `kmeans_*` parameters
+
+**this took 40 minutes with kmeans_method = "kmeans"**
 
 ```{r}
-
+# initiate and perform segmentation of images based on superpixels, affinity propagation and kmeans clustering
+# ?SuperpixelImageSegmentation::Image_Segmentation
+init <- SuperpixelImageSegmentation::Image_Segmentation$new()
 superpixels_slicap_ans <- init$spixel_segmentation(
-  input_image = im_km
-  superpixel = 600
-  AP_data = TRUE
-  use_median = TRUE
-  sim_wL = 3
-  sim_wA = 10
-  sim_wB = 10
-  sim_color_radius = 10
-  kmeans_method = "kmeans"
-  kmeans_initializer = "kmeans++"
-  kmeans_num_init = 3
-  kmeans_max_iters = 100
-  verbose = TRUE
+  input_image = im_temp
+  # a numeric value specifying the number of superpixels
+  , superpixel = sp_temp # 3333
+  # Either "slic" or "slico"
+  , method = "slico"
+  # a character string specifying the kmeans method. If not empty ("") then it can be either "kmeans" or "mini_batch_kmeans"
+  , kmeans_method = "mini_batch_kmeans"
+  # the method of initialization. One of, optimal_init, quantile_init, kmeans++ and random
+  , kmeans_initializer = "kmeans++"
+  # number of times the algorithm will be run with different centroid seeds
+  , kmeans_num_init = 3
+  # the maximum number of clustering iterations
+  , kmeans_max_iters = 100
+  # If TRUE then the affinity propagation image data will be computed and returned
+  , AP_data = TRUE
+  # If TRUE then the median will be used rather than the mean value for the inner computations (see the details section for more information)
+  , use_median = TRUE
+  # a numeric value specifying the weight for the "L" channel of the image (the weights of the three channels based on the "CIELAB color space")
+  , sim_wL = 3
+  # a numeric value specifying the weight for the "A" channel of the image (the weights of the three channels based on the "CIELAB color space")
+  , sim_wA = 10
+  # a numeric value specifying the weight for the "B" channel of the image (the weights of the three channels based on the "CIELAB color space")
+  , sim_wB = 10
+  # numeric value specifying the colorradius: 
+    ## adjusts the number of clusters, and if its value is low, the number of targets would increase, which leads to more detailed segmentation results
+  , sim_color_radius = 2
+  , verbose = TRUE
 )
-
 ```
 
-The following image shows the output based on **Superpixels + AP**
+what did we get back?
 
 ```{r}
+superpixels_slicap_ans %>% str()
+```
 
+let's see the clustering output based on **Superpixels + AP + Kmeans** and we'll add the pile outlines in blue
+
+```{r}
+# # Superpixels + AP
+# OpenImageR::imageShow(superpixels_slicap_ans$AP_image_data)
+# # Superpixels + AP + Kmeans
+# OpenImageR::imageShow(superpixels_slicap_ans$KMeans_image_data)
+# use the ortho template so we get the projection and then fill with values
+rast_temp <- ortho_rast %>% terra::subset(1)
+rast_temp[] <- superpixels_slicap_ans$KMeans_image_data[,,1] %>% terra::rast()
+# the unique values in the layer represent the unique clusters
+rast_temp <- terra::subst(
+    rast_temp
+    , from = terra::values(rast_temp) %>% unique() %>% c()
+    , to = 1:(terra::values(rast_temp) %>% unique() %>% length())
+  ) %>% 
+  terra::as.factor()
+# rast_temp %>% terra::crs()
+# rast_temp %>% terra::plot()
+# reset the colors
+terra::coltab(rast_temp) <- data.frame(
+  value = terra::minmax(rast_temp)[1]:terra::minmax(rast_temp)[2]
+  , col = viridis::turbo(terra::unique(rast_temp) %>% nrow(), alpha = 0.9)
+)
+# plot
+terra::plot(rast_temp, colNA = "black", axes=F)
+terra::plot(
+  slash_piles_polys %>% 
+    sf::st_transform(terra::crs(ortho_rast)) %>% terra::vect()
+  , add = T, border = "blue", col = NA, lwd = 1.2, axes=F
+)
+```
+
+let's check the distribution of the clusters within the pile locations
+
+```{r}
+tab_temp <- rast_temp %>% 
+  terra::extract(
+    slash_piles_polys %>% 
+      sf::st_transform(terra::crs(ortho_rast)) %>% terra::vect()
+    , ID = F
+  ) %>% 
+  dplyr::rename(cluster = 1) %>% 
+  dplyr::count(cluster) %>% 
+  dplyr::mutate(pct = n/sum(n)) %>% 
+  dplyr::arrange(desc(n)) 
+# table
+tab_temp %>% 
+  dplyr::select(-n) %>% 
+  dplyr::mutate(pct = scales::percent(pct,accuracy=0.1)) %>% 
+  kableExtra::kbl(
+    col.names = c("cluster","pct of clusters<br>that overlap with a pile")
+    , escape = F
+  ) %>% 
+  kableExtra::kable_styling()
+```
+
+did anything change with the **Superpixels + AP** output?
+
+```{r}
+# use the ortho template so we get the projection and then fill with values
+rast_temp <- ortho_rast %>% terra::subset(1)
+rast_temp[] <- superpixels_slicap_ans$AP_image_data[,,1] %>% terra::rast()
+# the unique values in the layer represent the unique clusters
+rast_temp <- terra::subst(
+    rast_temp
+    , from = terra::values(rast_temp) %>% unique() %>% c()
+    , to = 1:(terra::values(rast_temp) %>% unique() %>% length())
+  ) %>% 
+  terra::as.factor()
+# rast_temp %>% terra::crs()
+# rast_temp %>% terra::plot()
+# reset the colors
+terra::coltab(rast_temp) <- data.frame(
+  value = terra::minmax(rast_temp)[1]:terra::minmax(rast_temp)[2]
+  , col = viridis::turbo(terra::unique(rast_temp) %>% nrow(), alpha = 0.9)
+)
+# plot
+terra::plot(rast_temp, colNA = "black", axes=F)
+terra::plot(
+  slash_piles_polys %>% 
+    sf::st_transform(terra::crs(ortho_rast)) %>% terra::vect()
+  , add = T, border = "blue", col = NA, lwd = 1.2, axes=F
+)
+```
+
+no.
+
+### Feature Extraction for Superpixels
+
+let's go back to classifying the superpixels we generated using [SLICO](#slic)
+
+1. Image Segmentation (e.g. using SLIC) as [demonstrated above](#slic)
+2. Feature Extraction for Superpixels: instead of using individual pixel values, extract features that describe each superpixel (e.g. spectral bands, band ratios, textural features)
+3. Use labeled training data to assign superpixels to their respective classes and perform classifier training (i.e. using random forest, support vector machines, etc.)
+4. Once the classifier is trained, you apply it to the features of all the unlabeled superpixels in the image
+
+```{r}
+# terra::plot(superpixels_slico_rast, legend = F)
+# terra::values(superpixels_slico_rast) %>% unique() %>% length()
+# terra::as.polygons(superpixels_slico_rast, aggregate = T, values = T) %>% terra::plot(legend = T)
+# convert superpixels to polygons
+superpixels_slico_sf <- terra::as.polygons(superpixels_slico_rast, aggregate = T, values = T) %>% 
+  sf::st_as_sf() %>% 
+  dplyr::rename(superpixel_id = 1)
+# list of functions to aggregate pixel data to superpixel
+fn_list <- list(
+  mean = function(x){mean(x,na.rm = T)}
+  , median = function(x){median(x,na.rm = T)}
+  , sd = function(x){sd(x,na.rm = T)}
+  , q90 = function(x){quantile(x, probs = 0.9, na.rm = T)}
+  , q10 = function(x){quantile(x, probs = 0.1, na.rm = T)}
+  , mode = function(x) {
+      # Get the unique values in the vector
+      unique_values <- unique(x)
+      # Calculate the frequency of each unique value
+      value_frequencies <- tabulate(match(x, unique_values))
+      # Find the index of the maximum frequency
+      max_frequency_index <- which.max(value_frequencies)[1]
+      # Return the unique value corresponding to the maximum frequency
+      return(unique_values[max_frequency_index])
+    }
+)
+# feature extraction for superpixels
+superpixels_features_df <-
+  pred_rast %>% 
+  terra::extract(
+    y = superpixels_slico_sf %>% terra::vect()
+    # , fun = "table"
+    , ID = T
+  ) %>% 
+  dplyr::group_by(ID) %>% 
+  dplyr::summarise(dplyr::across(
+    .cols = dplyr::where(is.numeric)
+    , .fns = fn_list
+    , .names = "{.col}_{.fn}"
+  )) %>% 
+  dplyr::ungroup() %>% 
+  # get rid of summary variables for local_minima values since it's on 0-8 scale
+  dplyr::select(
+    -c(
+      tidyselect::contains("local_minima_mean")
+      , tidyselect::contains("local_minima_median")
+      , tidyselect::contains("local_minima_sd")
+      , tidyselect::contains("local_minima_q10")
+      , tidyselect::contains("local_minima_q90")
+    )
+  )
+
+superpixels_features_df %>% 
+   %>% 
+  # dplyr::select(tidyselect::contains("local_minima")) %>% 
+  # summary()
+
+# superpixels_slico_sf %>% 
+#   dplyr::bind_cols(superpixels_features_df) %>% 
+#   ggplot() + geom_sf(aes(fill = grvi_median)) + 
+#   harrypotter::scale_fill_hp(option = "slytherin", na.value = "black") +
+#   theme_void() + theme(legend.position = "none")
+# grvi_rast %>% terra::aggregate(fact = 4) %>%  
+#   terra::plot(axes = F, legend = F, col = harrypotter::hp(n=200, option = "slytherin"))
 ```
 
