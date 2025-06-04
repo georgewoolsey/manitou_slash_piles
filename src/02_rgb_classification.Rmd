@@ -1252,7 +1252,7 @@ let's see the output based on **Superpixels + AP**
 OpenImageR::imageShow(superpixels_slicap_ans$AP_image_data)
 ```
 
-ok, let's increase the number of superpixels to get finer detail (but significantly increase processing time)
+ok, let's increase the number of `superpixel` and decrease the `sim_color_radius` to get finer detail (but significantly increase processing time)
 
 ```{r}
 # readImage on our RGB raster for segmentation
@@ -1262,7 +1262,7 @@ init <- SuperpixelImageSegmentation::Image_Segmentation$new()
 superpixels_slicap_ans <- init$spixel_segmentation(
   input_image = im_temp
   # a numeric value specifying the number of superpixels
-  , superpixel = 1200
+  , superpixel = sp_temp # 3333
   # a character string specifying the kmeans method. If not empty ("") then it can be either "kmeans" or "mini_batch_kmeans"
   , kmeans_method = ""
   # If TRUE then the affinity propagation image data will be computed and returned
@@ -1277,32 +1277,72 @@ superpixels_slicap_ans <- init$spixel_segmentation(
   , sim_wB = 10
   # numeric value specifying the colorradius: 
     ## adjusts the number of clusters, and if its value is low, the number of targets would increase, which leads to more detailed segmentation results
-  , sim_color_radius = 10
+  , sim_color_radius = 3
   , verbose = TRUE
 )
 ```
 
-let's see the output based on **Superpixels + AP** and we'll add the pile outlines in blue
+let's see the clustering output based on **Superpixels + AP** and we'll add the pile outlines in blue
+
+```{r, include = F, eval = F}
+OpenImageR::imageShow(superpixels_slicap_ans$AP_image_data)
+superpixels_slicap_ans %>% str()
+superpixels_slicap_ans$AP_image_data %>% str()
+superpixels_slicap_ans$AP_image_data[,,1] %>% c() %>% unique() %>% length()
+superpixels_slicap_ans$AP_image_data[,,2] %>% c() %>% unique() %>% length()
+superpixels_slicap_ans$AP_image_data[,,3] %>% c() %>% unique() %>% length()
+```
 
 ```{r}
-superpixels_slicap_ans %>% str()
+# use the ortho template so we get the projection and then fill with values
 rast_temp <- ortho_rast %>% terra::subset(1)
 rast_temp[] <- superpixels_slicap_ans$AP_image_data[,,1] %>% terra::rast()
-rast_temp$green <- ortho_rast %>% terra::subset(1)
-rast_temp$green[] <- superpixels_slicap_ans$AP_image_data[,,2] %>% terra::rast()
-rast_temp$blue <- ortho_rast %>% terra::subset(1)
-rast_temp$blue[] <- superpixels_slicap_ans$AP_image_data[,,2] %>% terra::rast()
+# the unique values in the layer represent the unique clusters
+rast_temp <- terra::subst(
+    rast_temp
+    , from = terra::values(rast_temp) %>% unique() %>% c()
+    , to = 1:(terra::values(rast_temp) %>% unique() %>% length())
+  ) %>% 
+  terra::as.factor()
 # rast_temp %>% terra::crs()
 # rast_temp %>% terra::plot()
+# reset the colors
+terra::coltab(rast_temp) <- data.frame(
+  value = 1:(terra::unique(rast_temp) %>% nrow())
+  , col = viridis::turbo(terra::unique(rast_temp) %>% nrow(), alpha = 0.9)
+)
+# plot
 rast_temp %>% 
-  terra::subset(1:3) %>% 
-  terra::plotRGB(stretch = "lin", colNA = "black")
+  terra::plot(colNA = "black", axes=F)
 terra::plot(
   slash_piles_polys %>% 
     sf::st_transform(terra::crs(ortho_rast)) %>% terra::vect()
-  , add = T, border = "blue", col = NA, lwd = 1.2
+  , add = T, border = "blue", col = NA, lwd = 1.2, axes=F
 )
 ```
+
+it looks like the automatic clustering did not consistently classify the pile locations
+
+```{r}
+rast_temp %>% 
+  terra::extract(
+    slash_piles_polys %>% 
+      sf::st_transform(terra::crs(ortho_rast)) %>% terra::vect()
+    , ID = F
+  ) %>% 
+  dplyr::rename(cluster = 1) %>% 
+  dplyr::count(cluster) %>% 
+  dplyr::mutate(pct = scales::percent(n/sum(n))) %>% 
+  dplyr::arrange(desc(n))
+### 
+terra::subst(rast_temp, from = c(14,15,13,19), to = 1, others = NA) %>% terra::plot(axes = F, legend = F)
+terra::plot(
+  slash_piles_polys %>% 
+    sf::st_transform(terra::crs(ortho_rast)) %>% terra::vect()
+  , add = T, border = "blue", col = NA, lwd = 1.2, axes=F
+)
+```
+
 
 #### Kmeans to automatically determine clusters
 
