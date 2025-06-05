@@ -23,6 +23,7 @@ library(sf) # simple features
 library(lidR) # lidar data
 library(rgl) # 3d plots
 library(cloud2trees) # the cloud2trees
+library(glcm) # textures of rasters
 ```
 
 ```{r pkg-ld, include=F, warning=F, message=F}
@@ -103,7 +104,7 @@ Orthomosaic `tif` files from the UAS flight imagery that were created in [Agisof
     }
     ## apply the function
     ortho_list_temp <- 1:length(ortho_list_temp) %>% 
-      purrr::map(function(x){change_res_fn(ortho_list_temp[[x]], my_res=0.15)})
+      purrr::map(function(x){change_res_fn(ortho_list_temp[[x]], my_res=0.25)})
     
     # terra::res(ortho_list_temp[[1]])
     

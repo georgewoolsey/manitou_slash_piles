@@ -12,7 +12,9 @@ We'll see how far we can get without hyperspectral data since this data is less 
 
 ## Textural covariates
 
-[Rodman et al. (2019)](https://doi.org/10.1002/ecs2.2594) described a method using a series of image processing steps to add supplemental information describing the texture and context surrounding each image pixel in their analysis of forest cover change based only on panchromatic imagery (i.e. "black and white"). These textural covariates may be helpful for identifying slash piles, especially if we only have RGB data.
+[Haralick et al. (2007)](https://scholar.google.com/scholar?cluster=13863271628667072083&oi=gsb&hl=en&as_sdt=0,6) describe how quantitative measures of image texture can help distinguish between different imagery patterns that might have similar spectral signatures but distinct textures (e.g. vegetation types, habitat structures, or disturbance patterns). These textural features are typically calculated on a single-band grayscale image (i.e. panchromatic) but can also be calculated from spectral indicies (e.g. NDVI). Common Haralick statistics include: mean (average pixel value within the window), variance (variation in pixel values), homogeneity, contrast, and entropy (the randomness or disorder of the image)
+
+[Rodman et al. (2019)](https://doi.org/10.1002/ecs2.2594) also describe a method using a series of image processing steps to add supplemental information describing the texture and context surrounding each image pixel in their analysis of forest cover change based only on panchromatic imagery (i.e. "black and white"). These textural covariates may be helpful for identifying slash piles, especially if we only have RGB data.
 
 first, we'll make a single panchromatic band (the mean of red, green, and blue values) from our RGB imagery
 
@@ -38,18 +40,7 @@ terra::plot(
 )
 ```
 
-nice, now we'll make the textural covariates described by [Rodman et al. (2019)](https://doi.org/10.1002/ecs2.2594)
-
->During these steps, we identified locally dark pixels (indicative of individual trees surrounded by bright grassland) and quantified local standard deviation in brightness using moving windows at multiple scales (sensu Coburn and Roberts 2004; Fig. 3; Appendix S2). We combined these two layers with the original grayscale imagery to create three-band composite imagery (Fig. 3d). The combination of brightness, local minima, and standard deviation emphasizes differences in spectral reflectance that facilitate the separation of different forest structures (e.g., individual trees and dense stands) from non-forested areas. (p. 7)
-
-and from Appendix S2
-
->Our first metric identifies pixels that are darker than their surroundings (hereafter "local minima"). To identify local minima, we calculated the mean and standard deviation of pixel brightness at each scale (3-15 pixel windows). A pixel was considered to be darker than its surroundings if its brightness value was lower than the window mean minus two standard deviations. These calculations were made for each window size for each pixel, then summed across all window sizes (thus, local minima values range 0-7, where 7 indicates that a pixel is darker than its surroundings across all moving window sizes; Fig. 3b) 
-
->For the second metric, we calculated the sum of standard deviation values across all window sizes (Fig. 3c). Standard deviation of pixel brightness is a simple version of local texture that can improve forest classification in high-resolution imagery. While standard deviation is more computationally efficient than many other texture metrics (e.g., entropy based on greylevel co-occurrence matrices), it may still yield comparable performance in classification (Coburn and Roberts 2004). Standard deviation appeared helpful in separating dark forest stands (low brightness, moderate variance) from more homogenous areas (low brightness, low variance; i.e., water bodies, shadows). 
-
->We combined these three layers (brightness, local minima, and standard deviation) to create a three-band composite image (Fig. 3d)
-
+nice, now we'll make the textural covariates described by [Rodman et al. (2019)](https://doi.org/10.1002/ecs2.2594) in Appendix S2
 
 ```{r, include=FALSE, eval=TRUE}
 round_to_nearest_odd <- function(x) {
@@ -78,6 +69,33 @@ round_to_nearest_odd <- function(x) {
   return(result)
 }
 # round_to_nearest_odd(c(3.5, 4.2, 6.1, 7))
+calculate_cv <- function(x, ...) {
+  # Calculate the mean and standard deviation of the input vector x
+  mean_x <- mean(x, ...)
+  sd_x <- sd(x, ...)
+
+  # Handle the case where the mean is zero
+  if(dplyr::coalesce(mean_x,0) == 0) {
+    # If the standard deviation is also zero, the CV is 0
+    if (dplyr::coalesce(sd_x,0) == 0) {
+      return(0)
+    # If the standard deviation is non-zero, the CV is undefined (or approaching infinity)
+    } else {
+      return(as.numeric(NA)) # or return Inf, depending on how you want to represent this case
+    }
+  }else{
+    # Calculate and return the Coefficient of Variation as a percentage
+    return((sd_x / mean_x))
+  }
+}
+# calculate_cv(c(3.5, 4.2, 6.1, 7))
+# ### this takes foreverrrrrrrrrr
+# terra::focal(
+#   x = panchromatic_rast
+#   , w = 5
+#   , fun= calculate_cv # function(x, ...) quantile(x, c(.25), ...)
+#   , na.rm = T
+# ) %>% terra::plot()
 ```
 
 ```{r}
@@ -95,22 +113,25 @@ rast_rodmanetal2019_fn <- function(
   }else{
     windows_m <- round_to_nearest_odd(windows_m)
   }
-  
+  ################################
   # means
+  ################################
   r_means <- windows_m %>% 
     purrr::map(\(w)
       terra::focal(x = rast, w = w, fun = "mean", na.rm = T)
     )
   # r_means[[7]] %>% terra::plot(col = scales::pal_grey(0, 1)(100))
-  
+  ################################
   # sds
+  ################################
   r_sds <- windows_m %>% 
     purrr::map(\(w)
       terra::focal(x = rast, w = w, fun = "sd", na.rm = T)
     )
   # r_sds[[5]] %>% terra::plot(col = scales::pal_grey(0, 1)(100))
-  
+  ################################
   # local min
+  ################################
   local_min_fn <- function(rast, mean, sd) {
     as.numeric(rast < ( mean-(sd*2) ))
   }
@@ -120,22 +141,53 @@ rast_rodmanetal2019_fn <- function(
       local_min_fn(rast = rast, mean = r_means[[i]], sd = r_sds[[i]])
     )
   # r_local_min[[5]] %>% terra::plot()
+  ################################
+  # local coefficient of variation
+  ################################
+  local_cv_fn <- function(mean, sd) {
+    terra::clamp(sd/mean, lower = 0, upper = 1, values = T)
+  }
   
+  r_local_cv <- 1:length(r_means) %>% 
+    purrr::map(\(i)
+      local_cv_fn(mean = r_means[[i]], sd = r_sds[[i]])
+    )
+  # r_local_min[[5]] %>% terra::plot()
+  ################################
   # aggregate local min
+  ################################
   r_local_min_agg <- terra::rast(r_local_min) %>% 
     cumsum()
   
   # get the last of the local mins
   local_minima <- r_local_min_agg[[terra::nlyr(r_local_min_agg)]]
+  ################################
+  # aggregate local cv
+  ################################
+  r_local_cv_agg <- terra::rast(r_local_cv) %>% 
+    cumsum()
   
+  # get the last of the local cvs
+  local_cv <- r_local_cv_agg[[terra::nlyr(r_local_cv_agg)]]
+  ################################
   # aggregate local sd
+  ################################
   r_sds_agg <- terra::rast(r_sds) %>% 
     cumsum()
   
-  # get the last of the local mins
+  # get the last of the local sds
   local_sd <- r_sds_agg[[terra::nlyr(r_sds_agg)]]
+  ################################
+  # aggregate local mean
+  ################################
+  r_means_agg <- terra::rast(r_means) %>% 
+    cumsum()
   
+  # get the last of the local mean
+  local_mean <- r_means_agg[[terra::nlyr(r_means_agg)]]
+  ################################
   # composite
+  ################################
   composite <- c(rast, local_sd, local_minima)
   names(composite) <- c(rast_nm, "local_sd", "local_minima")
   
@@ -146,6 +198,8 @@ rast_rodmanetal2019_fn <- function(
   return(list(
     local_minima = local_minima
     , local_sd = local_sd
+    , local_mean = local_mean
+    , local_cv = local_cv
     , composite = composite
   ))
 }
@@ -159,17 +213,6 @@ rodmanetal2019_panchromatic_rast <- rast_rodmanetal2019_fn(
   rast = panchromatic_rast
   , rast_nm = "panchromatic"
   , scale_to_1m = F
-)
-```
-
-plot of "local minima" pixels that are darker than their surroundings
-
-```{r}
-# plot
-terra::plot(
-  rodmanetal2019_panchromatic_rast$local_minima
-  , col = scales::pal_grey(0, 1)(8)
-  , axes=F, legend = F
 )
 ```
 
@@ -198,6 +241,55 @@ terra::plot(
 )
 ```
 
+```{r, include = F, eval = F}
+### !!!!!!!!!!!!!!!!!!!!!!!! THIS TAKES WAAYYYYYYY TOOOO LONNNNGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG
+#### Haralick et al. (2007)
+
+# ?GLCMTextures::glcm_textures()
+# ?glcm::glcm
+# glcm_ans <- glcm::glcm(
+#     panchromatic_rast %>% raster::raster() # terra::as.matrix(wide=T)
+#     , n_grey = 32
+#     , window = c(5, 5)
+#     # To calculate GLCM textures over "all directions" (in the terminology of commonly used remote sensing software)
+#       # use: shift=list(c(0,1),c(1,1), c(1,0), c(1,-1))
+#       # This will calculate the average GLCM texture using shifts of 0 degrees, 45 degrees, 90 degrees, and 135 degrees.
+#     , shift = list(c(0,1),c(1,1), c(1,0), c(1,-1))
+#     , na_opt = "any"
+#   ) %>% 
+#   # return is from "raster" package :\ so convert
+#   terra::rast()
+glcm_ans <- GLCMTextures::glcm_textures(
+  r = panchromatic_rast
+  , w = c(5, 5)
+  , n_levels = 16
+  # To calculate GLCM textures over "all directions" (in the terminology of commonly used remote sensing software)
+      # use: shift=list(c(0,1),c(1,1), c(1,0), c(1,-1))
+      # This will calculate the average GLCM texture using shifts of 0 degrees, 45 degrees, 90 degrees, and 135 degrees.
+    , shift = list(c(0,1),c(1,1), c(1,0), c(1,-1))
+  , quant_method = "range"
+  , metrics = c(
+    "glcm_contrast"
+    , "glcm_dissimilarity"
+    , "glcm_homogeneity"
+    , "glcm_ASM"
+    , "glcm_entropy"
+    , "glcm_mean"
+    , "glcm_variance"
+    , "glcm_correlation"
+  )
+  , na.rm = T
+)
+
+
+
+glcm_ans %>% terra::rast() %>% 
+  terra::subset(5) %>% 
+  terra::plot(col = scales::pal_grey(0, 1)(100), axes = F)
+
+
+```
+
 ### Raster Texture: GRVI
 
 implement our `rast_rodmanetal2019_fn` function
@@ -223,6 +315,23 @@ terra::plot(
   , add = T, border = "white", col = NA
 )
 ```
+
+check out the local CV of GRVI
+
+```{r}
+terra::plot(
+  rodmanetal2019_grvi_rast$local_cv
+  , col = scales::pal_grey(0, 1)(100)
+  , axes=F, legend = F
+)
+# add polys
+terra::plot(
+  slash_piles_polys %>% sf::st_transform(terra::crs(grvi_rast)) %>% terra::vect()
+  , add = T, border = "blue", col = NA
+)
+```
+
+this metric looks promising as it indicates that piles are generally in areas with low CV...which indicates low variability, meaning the GRVI values are tightly clustered around the focal mean, suggesting consistency and stability.
 
 ### Plot textural rasters
 
@@ -367,15 +476,24 @@ let's combine our rasters into a raster stack and generate a data frame with ind
 names(rodmanetal2019_panchromatic_rast$composite) <- c(
   "panchromatic", "panchromatic_local_sd", "panchromatic_local_minima"
 )
+names(rodmanetal2019_panchromatic_rast$local_cv) <- c(
+  "panchromatic_local_cv"
+)
 names(rodmanetal2019_grvi_rast$composite) <- c(
   "grvi", "grvi_local_sd", "grvi_local_minima"
+)
+names(rodmanetal2019_grvi_rast$local_cv) <- c(
+  "grvi_local_cv"
 )
 # raster stack
 pred_rast <- c(
   terra::subset(ortho_rast, c("red","green","blue"))
   , rodmanetal2019_panchromatic_rast$composite
+  , rodmanetal2019_panchromatic_rast$local_cv
   , rodmanetal2019_grvi_rast$composite
+  , rodmanetal2019_grvi_rast$local_cv
 )
+# pred_rast %>% names()
 ```
 
 check out correlations between covariates
@@ -727,7 +845,7 @@ extract the raster cell values from each layer in our RGB-based raster data, the
 #############################
 #extract covariate data at point locations
 #############################
-training_dta <-
+training_df <-
   terra::extract(
     pred_rast
     , training_points %>%  
@@ -772,7 +890,7 @@ compare training and validation data to ensure that they are similar (i.e. we dr
 
 ```{r}
 dplyr::bind_rows(
-    training_dta %>% sf::st_drop_geometry() %>% dplyr::mutate(dta_set = "Training")
+    training_df %>% sf::st_drop_geometry() %>% dplyr::mutate(dta_set = "Training")
     , validation_dta %>% sf::st_drop_geometry() %>% dplyr::mutate(dta_set = "Validation")
   ) %>% 
   dplyr::select(-c(geometry,dplyr::ends_with("_sq"))) %>% 
@@ -795,7 +913,7 @@ ggplot(mapping = aes(x = value, color = dta_set, fill = dta_set, group = dta_set
     title = "Distribution of Model Covariates"
     , subtitle = paste0(
       "by Training (n="
-      , nrow(training_dta) %>% scales::comma(accuracy = 1)
+      , nrow(training_df) %>% scales::comma(accuracy = 1)
       , ") and Validation (n="
       , nrow(validation_dta) %>% scales::comma(accuracy = 1)
       , ") data"
@@ -818,8 +936,8 @@ we'll use a random forest model to predict raster values
 ```{r}
 # Tune on the full data if below threshold
 tune_result_temp <- randomForest::tuneRF(
-  y = training_dta$is_pile
-  , x = training_dta %>% sf::st_drop_geometry() %>% dplyr::select(-c(id,is_pile,geometry))
+  y = training_df$is_pile
+  , x = training_df %>% sf::st_drop_geometry() %>% dplyr::select(-c(id,is_pile,geometry))
   , ntreeTry = 500
   , stepFactor = 1
   , improve = 0.03
@@ -835,8 +953,8 @@ optimal_mtry_temp <- tune_result_temp %>%
   as.numeric()
 # pass to random forest model
 mod_rf <- randomForest::randomForest(
-  y = training_dta$is_pile
-  , x = training_dta %>% sf::st_drop_geometry() %>% dplyr::select(-c(id,is_pile,geometry))
+  y = training_df$is_pile
+  , x = training_df %>% sf::st_drop_geometry() %>% dplyr::select(-c(id,is_pile,geometry))
   , mtry = optimal_mtry_temp
   , na.action = na.omit
   , ntree = 500
@@ -1011,7 +1129,7 @@ gc()
 
 ## Object-based image analysis (OBIA)
 
-OBIA is a technique (or a set of techniques) used to analyze digital images that was developed relatively recently in comparison to ‘classic’ pixel-based image approaches ([Burnett and Blaschke 2003](https://doi.org/10.1016/S0304-3800(03)00139-X)). We will probably implement the OBIA approach using the `SegOptim` [package](https://github.com/joaofgoncalves/SegOptim) presented by [Goncalves et al. (2019)](https://doi.org/10.1016/j.jag.2018.11.011)
+OBIA is a technique (or a set of techniques) used to analyze digital images that was developed relatively recently in comparison to "classic" pixel-based image approaches ([Burnett and Blaschke 2003](https://doi.org/10.1016/S0304-3800(03)00139-X)). [Goncalves et al. (2019)](https://doi.org/10.1016/j.jag.2018.11.011) describe a general OBIA approach and created the `SegOptim` [package](https://github.com/joaofgoncalves/SegOptim) to execute this framework. However, their package relies on 3rd party software to implement the initial image segmentation. The `OTBsegm` [package](https://cidree.github.io/OTBsegm/) is another package that relies on 3rd party software to implement image segmentation. Alternatively, `imageseg` is an R package for deep learning-based image segmentation ([Niedballa et al. 2022](https://doi.org/10.1111/2041-210X.13984)). 
 
 An alternative that does not require 3rd party software and works entirely within the R framework is the `OpenImageR` [package](https://mlampros.github.io/OpenImageR/index.html).
 
@@ -1168,7 +1286,7 @@ sp_temp <- floor(
       (
         slash_piles_polys %>% dplyr::mutate(area = sf::st_area(.) %>% as.numeric()) %>% 
         dplyr::pull(area) %>% 
-        quantile(probs = 0.95)
+        quantile(probs = 0.5)
       )
   ) %>% 
   max(200) # 200 = function default
@@ -1250,6 +1368,281 @@ the steps in the OBIA approach workflow described by [Goncalves et al. (2019)](h
 2. Feature Extraction for Superpixels: instead of using individual pixel values, extract features that describe each superpixel (e.g. spectral bands, band ratios, textural features)
 3. Use labeled training data to assign superpixels to their respective classes and perform classifier training (i.e. using random forest, support vector machines, etc.)
 4. Once the classifier is trained, you apply it to the features of all the unlabeled superpixels in the image
+
+#### Feature Extraction for Superpixels
+
+let's classify the superpixels we generated using [SLICO](#slic)
+
+1. Image Segmentation (e.g. using SLIC) as [demonstrated above](#slic)
+2. Feature Extraction for Superpixels: instead of using individual pixel values, extract features that describe each superpixel (e.g. spectral bands, band ratios, textural features)
+3. Use labeled training data to assign superpixels to their respective classes and perform classifier training (i.e. using random forest, support vector machines, etc.)
+4. Once the classifier is trained, you apply it to the features of all the unlabeled superpixels in the image
+
+```{r}
+# terra::plot(superpixels_slico_rast, legend = F)
+# terra::values(superpixels_slico_rast) %>% unique() %>% length()
+# terra::as.polygons(superpixels_slico_rast, aggregate = T, values = T) %>% terra::plot(legend = T)
+# convert superpixels to polygons
+superpixels_slico_sf <- terra::as.polygons(superpixels_slico_rast, aggregate = T, values = T) %>% 
+  sf::st_as_sf() %>% 
+  dplyr::rename(superpixel_id = 1)
+# list of functions to aggregate pixel data to superpixel
+fn_list <- list(
+  mean = function(x){mean(x,na.rm = T)}
+  , median = function(x){median(x,na.rm = T)}
+  , sd = function(x){sd(x,na.rm = T)}
+  , q90 = function(x){quantile(x, probs = 0.9, na.rm = T)}
+  , q10 = function(x){quantile(x, probs = 0.1, na.rm = T)}
+  # , mode = function(x) {
+  #     # Get the unique values in the vector
+  #     unique_values <- unique(x)
+  #     # Calculate the frequency of each unique value
+  #     value_frequencies <- tabulate(match(x, unique_values))
+  #     # Find the index of the maximum frequency
+  #     max_frequency_index <- which.max(value_frequencies)[1]
+  #     # Return the unique value corresponding to the maximum frequency
+  #     return(unique_values[max_frequency_index])
+  #   }
+)
+# feature extraction for superpixels and aggregation
+superpixels_features_df <-
+  pred_rast %>% 
+  terra::extract(
+    y = superpixels_slico_sf %>% terra::vect()
+    , ID = T
+  ) %>% 
+  dplyr::group_by(ID) %>% 
+  dplyr::summarise(dplyr::across(
+    .cols = dplyr::where(is.numeric)
+    , .fns = fn_list
+    , .names = "{.col}_{.fn}"
+  )) %>% 
+  dplyr::ungroup() %>% 
+  # get rid of summary variables for local_minima values since it's on 0-8 scale
+  dplyr::select(
+    -c(
+      tidyselect::contains("local_minima_mean")
+      , tidyselect::contains("local_minima_median")
+      , tidyselect::contains("local_minima_sd")
+      , tidyselect::contains("local_minima_q10")
+      , tidyselect::contains("local_minima_q90")
+      , tidyselect::contains("local_minima") # just get rid of all local_minima since aggregation at this level just results in 0's
+    )
+  ) %>% 
+  # get rid of nan
+  dplyr::mutate(dplyr::across(
+    .cols = dplyr::where(is.numeric)
+    , .fns = ~ ifelse(
+          is.nan(.x) | is.infinite(.x)
+          , as.numeric(NA)
+          , .x
+        )
+  ))
+# add to the spatial data
+superpixels_slico_sf <- superpixels_slico_sf %>% dplyr::bind_cols(superpixels_features_df %>% dplyr::select(-ID))
+```
+
+let's check out that we got what we expected by plotting median GRVI in each superpixel
+
+```{r}
+superpixels_slico_sf %>%
+  ggplot2::ggplot() + 
+  ggplot2::geom_sf(ggplot2::aes(fill = grvi_median)) +
+  harrypotter::scale_fill_hp(option = "slytherin", na.value = "black") +
+  ggplot2::theme_void() + 
+  ggplot2::theme(legend.position = "none")
+# grvi_rast %>% terra::aggregate(fact = 4) %>%  
+#   terra::plot(axes = F, legend = F, col = harrypotter::hp(n=200, option = "slytherin"))
+```
+
+looks good. now we'll use the training data to attach pile/non-pile information to each superpixel
+
+```{r, include=F, eval=FALSE}
+class_rast_training %>% terra::writeRaster("../data/class_rast_training.tif", overwrite=T)
+class_rast %>% terra::writeRaster("../data/class_rast.tif", overwrite=T)
+superpixels_slico_sf %>% sf::st_write("../data/superpixels_slico_sf.gpkg", append = F)
+superpixels_features_df %>% readr::write_csv("../data/superpixels_features_df.csv", append = F)
+```
+
+```{r, include=F, eval=FALSE}
+class_rast_training <- terra::rast("../data/class_rast_training.tif")
+class_rast <- terra::rast("../data/class_rast.tif")
+superpixels_slico_sf <- sf::st_read("../data/superpixels_slico_sf.gpkg")
+superpixels_features_df <- readr::read_csv("../data/superpixels_features_df.csv")
+```
+
+check the training versus validation (dimmed) data with the superpixels overlaid
+
+```{r}
+terra::plot(class_rast_training, axes=F, legend = F)
+terra::plot(class_rast, alpha = 0.2, add = T, axes=F, legend = F)
+superpixels_slico_sf %>% terra::vect() %>% terra::plot(add = T)
+```
+
+we'll take the mean of the 0/1 values to get the proportion of the superpixel that overlaps with the location of a pile (think of this as the probability that a superpixel is a pile)
+
+```{r}
+# get rid of superpixels that are in the validation
+training_superpixel_id <- terra::mask(
+    superpixels_slico_sf %>% terra::vect()
+    , sample_grid %>% terra::as.polygons()
+  ) %>% 
+  sf::st_as_sf() %>% 
+  sf::st_drop_geometry() %>% 
+  dplyr::pull(superpixel_id)
+# extract classified values
+training_df <- class_rast %>%
+  terra::extract(
+    y = superpixels_slico_sf %>% 
+      dplyr::filter(superpixel_id %in% training_superpixel_id) %>% 
+      terra::vect()
+    , fun = "mean"
+    , ID = T
+    , na.rm = T
+  ) %>% 
+  dplyr::rename(pr_pile = 2) %>% 
+  # get rid of nan
+  dplyr::mutate(dplyr::across(
+    .cols = dplyr::where(is.numeric)
+    , .fns = ~ ifelse(
+          is.nan(.x) | is.infinite(.x)
+          , as.numeric(NA)
+          , .x
+        )
+  ))
+# join with features and pile id's, geometry
+training_df <- superpixels_slico_sf %>% 
+  dplyr::filter(superpixel_id %in% training_superpixel_id) %>% 
+  dplyr::bind_cols(training_df %>% dplyr::select(-ID)) %>% 
+  dplyr::filter(!is.na(pr_pile)) %>% # because all values should be filled except for validation data
+  dplyr::filter(!dplyr::if_any(dplyr::everything(), ~ is.na(.x))) # cant pass NA to classifier
+# what?
+training_df %>% dplyr::glimpse()
+```
+
+for superpixels covered by a pile, what is the distribution of percentage of superpixel that is covered by a pile?
+
+```{r}
+training_df %>% 
+  dplyr::filter(pr_pile>0) %>% 
+  dplyr::pull(pr_pile) %>% 
+  summary()
+```
+
+check it on the map
+
+```{r}
+training_df %>% 
+  ggplot2::ggplot() +
+  ggplot2::geom_sf(ggplot2::aes(fill = pr_pile)) +
+  ggplot2::geom_sf(data = slash_piles_polys, fill = NA, color = "blue", lwd = 0.3) +
+  ggplot2::scale_fill_viridis_c(option = "mako", direction = -1, na.value = "white") +
+  ggplot2::theme_void()
+```
+
+we can also see what it looks like if we include only pixels with >20% (~median value) of their area covered by a pile
+
+```{r}
+training_df %>% 
+  ggplot2::ggplot() +
+  ggplot2::geom_sf(ggplot2::aes(fill = pr_pile>0.2)) +
+  ggplot2::geom_sf(data = slash_piles_polys, fill = NA, color = "blue", lwd = 0.3) +
+  ggplot2::scale_fill_viridis_d(option = "magma", begin = 0.2, end = 0.8, na.value = "white") +
+  ggplot2::theme_void()
+```
+
+#### Classifier training for Superpixels
+
+nice, now let's train the a random forest classifier to predict superpixel values
+
+```{r}
+# Tune on the full data if below threshold
+tune_result_temp <- randomForest::tuneRF(
+  y = training_df$pr_pile
+  , x = training_df %>% sf::st_drop_geometry() %>% dplyr::select(-c(superpixel_id,pr_pile))
+  , ntreeTry = 500
+  , stepFactor = 1
+  , improve = 0.03
+  , plot = F
+  , trace = F
+)
+# Extract the optimal mtry value
+optimal_mtry_temp <- tune_result_temp %>%
+  dplyr::as_tibble() %>%
+  dplyr::filter(OOBError==min(OOBError)) %>%
+  dplyr::filter(dplyr::row_number() == 1) %>%
+  dplyr::pull(mtry) %>%
+  as.numeric()
+# pass to random forest model
+mod_rf <- randomForest::randomForest(
+  y = training_df$pr_pile
+  , x = training_df %>% sf::st_drop_geometry() %>% dplyr::select(-c(superpixel_id,pr_pile))
+  , mtry = optimal_mtry_temp
+  , na.action = na.omit
+  , ntree = 500
+)
+```
+
+random forest variable importance plot
+
+```{r}
+#variable importance plot
+randomForest::varImpPlot(mod_rf)
+```
+
+#### Predict values for validation superpixels
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE, include=FALSE}
+remove(list = ls()[grep("_temp",ls())])
+gc()
+```
+
+```{r}
+validation_df <- superpixels_slico_sf %>% 
+  dplyr::filter(!superpixel_id %in% training_superpixel_id) %>% 
+  dplyr::filter(!dplyr::if_any(dplyr::everything(), ~ is.na(.x))) # cant pass NA to classifier
+# predict
+validation_df <- validation_df %>% 
+  dplyr::mutate(
+    pr_pile_pred = stats::predict(
+      mod_rf
+      , newdata = validation_df %>% 
+        sf::st_drop_geometry() %>% 
+        dplyr::select(
+          training_df %>% sf::st_drop_geometry() %>% dplyr::select(-c(superpixel_id,pr_pile)) %>% names()
+        )
+    )
+  )
+```
+
+plot predictions
+
+```{r}
+validation_df %>% 
+  ggplot2::ggplot() +
+  ggplot2::geom_sf(ggplot2::aes(fill = pr_pile_pred)) +
+  ggplot2::geom_sf(data = slash_piles_polys, fill = NA, color = "blue", lwd = 0.3) +
+  ggplot2::scale_fill_viridis_c(option = "mako", direction = -1, na.value = "white") +
+  ggplot2::theme_void()
+```
+
+we can also see what it looks like if we include only pixels with >10% of their area covered by a pile
+
+```{r}
+validation_df %>% 
+  ggplot2::ggplot() +
+  ggplot2::geom_sf(ggplot2::aes(fill = pr_pile_pred>0.2)) +
+  ggplot2::geom_sf(data = slash_piles_polys, fill = NA, color = "blue", lwd = 0.3) +
+  ggplot2::scale_fill_viridis_d(option = "magma", begin = 0.2, end = 0.8, na.value = "white") +
+  ggplot2::theme_void()
+```
+
+evaluate model performance based on the Area under the Receiver Operating Characteristic (ROC) Curve (AUC) criterion (an AUC value of 0.5 can be interpreted as the model performing no better than a random prediction). Higher AUC values indicate that the model is better at predicting "absence" classes as "absence" (true negative) and "presence" classes as "presence" (true positive).
+
+```{r}
+### coming soon
+```
+
 
 ### `SuperpixelImageSegmentation` package SLICAP clustering
 
@@ -1547,79 +1940,3 @@ terra::plot(
 ```
 
 no.
-
-### Feature Extraction for Superpixels
-
-let's go back to classifying the superpixels we generated using [SLICO](#slic)
-
-1. Image Segmentation (e.g. using SLIC) as [demonstrated above](#slic)
-2. Feature Extraction for Superpixels: instead of using individual pixel values, extract features that describe each superpixel (e.g. spectral bands, band ratios, textural features)
-3. Use labeled training data to assign superpixels to their respective classes and perform classifier training (i.e. using random forest, support vector machines, etc.)
-4. Once the classifier is trained, you apply it to the features of all the unlabeled superpixels in the image
-
-```{r}
-# terra::plot(superpixels_slico_rast, legend = F)
-# terra::values(superpixels_slico_rast) %>% unique() %>% length()
-# terra::as.polygons(superpixels_slico_rast, aggregate = T, values = T) %>% terra::plot(legend = T)
-# convert superpixels to polygons
-superpixels_slico_sf <- terra::as.polygons(superpixels_slico_rast, aggregate = T, values = T) %>% 
-  sf::st_as_sf() %>% 
-  dplyr::rename(superpixel_id = 1)
-# list of functions to aggregate pixel data to superpixel
-fn_list <- list(
-  mean = function(x){mean(x,na.rm = T)}
-  , median = function(x){median(x,na.rm = T)}
-  , sd = function(x){sd(x,na.rm = T)}
-  , q90 = function(x){quantile(x, probs = 0.9, na.rm = T)}
-  , q10 = function(x){quantile(x, probs = 0.1, na.rm = T)}
-  , mode = function(x) {
-      # Get the unique values in the vector
-      unique_values <- unique(x)
-      # Calculate the frequency of each unique value
-      value_frequencies <- tabulate(match(x, unique_values))
-      # Find the index of the maximum frequency
-      max_frequency_index <- which.max(value_frequencies)[1]
-      # Return the unique value corresponding to the maximum frequency
-      return(unique_values[max_frequency_index])
-    }
-)
-# feature extraction for superpixels
-superpixels_features_df <-
-  pred_rast %>% 
-  terra::extract(
-    y = superpixels_slico_sf %>% terra::vect()
-    # , fun = "table"
-    , ID = T
-  ) %>% 
-  dplyr::group_by(ID) %>% 
-  dplyr::summarise(dplyr::across(
-    .cols = dplyr::where(is.numeric)
-    , .fns = fn_list
-    , .names = "{.col}_{.fn}"
-  )) %>% 
-  dplyr::ungroup() %>% 
-  # get rid of summary variables for local_minima values since it's on 0-8 scale
-  dplyr::select(
-    -c(
-      tidyselect::contains("local_minima_mean")
-      , tidyselect::contains("local_minima_median")
-      , tidyselect::contains("local_minima_sd")
-      , tidyselect::contains("local_minima_q10")
-      , tidyselect::contains("local_minima_q90")
-    )
-  )
-
-superpixels_features_df %>% 
-   %>% 
-  # dplyr::select(tidyselect::contains("local_minima")) %>% 
-  # summary()
-
-# superpixels_slico_sf %>% 
-#   dplyr::bind_cols(superpixels_features_df) %>% 
-#   ggplot() + geom_sf(aes(fill = grvi_median)) + 
-#   harrypotter::scale_fill_hp(option = "slytherin", na.value = "black") +
-#   theme_void() + theme(legend.position = "none")
-# grvi_rast %>% terra::aggregate(fact = 4) %>%  
-#   terra::plot(axes = F, legend = F, col = harrypotter::hp(n=200, option = "slytherin"))
-```
-
