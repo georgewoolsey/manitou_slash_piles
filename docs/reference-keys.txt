@@ -13,7 +13,14 @@ textural-covariates
 raster-texture-panchromatic
 raster-texture-grvi
 plot-textural-rasters
-unsupervised-classification
-supervised-classification
+features-for-classification
+pixel-based-unsupervised-classification
+pixel-based-supervised-classification
+object-based-image-analysis-obia
+training-data
+slic
+feature-extraction-for-superpixels
+classifier-training-for-superpixels
+predict-values-for-validation-superpixels
 point-cloud-classification
 process-raw-point-cloud
