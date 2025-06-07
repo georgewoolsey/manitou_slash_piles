@@ -493,6 +493,16 @@ pred_rast <- c(
   , rodmanetal2019_grvi_rast$composite
   , rodmanetal2019_grvi_rast$local_cv
 )
+# mask NA values from original data
+pred_rast <- pred_rast %>% 
+  terra::mask(
+    ortho_rast %>% 
+      terra::subset(c("red","green","blue")) %>% 
+      cumsum() %>% 
+      terra::subset(3) %>% 
+      terra::subst(from = 0, to = 1, others = NA)
+    , inverse = T
+  )
 # pred_rast %>% names()
 ```
 
@@ -1265,6 +1275,19 @@ terra::writeRaster(
   , filename = fpath_class
   , overwrite = T
 )
+
+terra::mask(
+  pred_rast
+  , ortho_rast %>% 
+    terra::subset(c("red","green","blue")) %>% 
+    cumsum() %>% 
+    terra::subset(3) %>% 
+    terra::subst(from = 0, to = 1, others = NA)
+  , inverse = T
+) %>% 
+terra::subset(1) %>% 
+terra::plot()
+
 ```
 
 we'll implement the SLICO variation of SLIC because the user does not need to define the compactness parameter or try different values of it. SLICO adaptively chooses the compactness parameter for each superpixel differently. This generates regular shaped superpixels in both textured and non textured regions alike. The improvement comes with hardly any compromise on the computational efficiency - SLICO continues to be as fast as SLIC ([**How is SLICO different from SLIC?**](https://www.epfl.ch/labs/ivrl/research/slic-superpixels/#SLICO))
@@ -1286,22 +1309,20 @@ sp_temp <- floor(
       (
         slash_piles_polys %>% dplyr::mutate(area = sf::st_area(.) %>% as.numeric()) %>% 
         dplyr::pull(area) %>% 
-        quantile(probs = 0.5)
+        quantile(probs = 0.33)
       )
   ) %>% 
   max(200) # 200 = function default
 
-# superpixels
-superpixels_slico_ans <- OpenImageR::superpixels(
-  input_image = im_temp
-  # Either "slic" or "slico"
+try_superpixels_fn <- function(
+  input_image
   , method = "slico" 
   # number of superpixels to use
-  , superpixel = sp_temp
+  , superpixel = 200
   # numeric value specifying the compactness parameter. 
     # The compactness parameter is needed only if method is "slic". The "slico" method adaptively chooses
     # the compactness parameter for each superpixel differently
-  # , compactness = 20 
+  , compactness = 20
   # If TRUE then the resulted slic or slico data will be returned
   , return_slic_data = TRUE
   # If TRUE then the Lab data will be returned ( the Lab-colour format )
@@ -1309,7 +1330,62 @@ superpixels_slico_ans <- OpenImageR::superpixels(
   # If not an empty string ("") then it should be a path to the output file with extension .bin 
   , write_slic = ""
   , verbose = TRUE
-)
+) {
+  # make sure sp is integer
+  new_sp <- dplyr::coalesce(superpixel, 200) %>% floor()
+  # make a list of backup sp
+  try_sp <- seq(from = max(floor(new_sp*0.95),10), to = max(floor(new_sp*1.05),10), by = 1) %>% 
+    base::setdiff(new_sp) %>% 
+    sample()
+  
+  # safe it
+  safe_superpixels <- purrr::safely(OpenImageR::superpixels)
+  
+  # while loop to handle superpixel errors
+  xx <- 1
+  
+  while(xx!=0 && xx<length(try_sp)) {
+    # superpixels
+    superpixels_slico_ans <- safe_superpixels(
+      input_image = input_image
+      # Either "slic" or "slico"
+      , method = method
+      # number of superpixels to use
+      , superpixel = new_sp
+      # numeric value specifying the compactness parameter. 
+        # The compactness parameter is needed only if method is "slic". The "slico" method adaptively chooses
+        # the compactness parameter for each superpixel differently
+      # , compactness = 20 
+      # If TRUE then the resulted slic or slico data will be returned
+      , return_slic_data = return_slic_data
+      # If TRUE then the Lab data will be returned ( the Lab-colour format )
+      , return_labels = return_labels
+      # If not an empty string ("") then it should be a path to the output file with extension .bin 
+      , write_slic = write_slic
+      , verbose = verbose
+    )
+    
+    # check
+    if(is.null(superpixels_slico_ans$error)){
+      # just get the result
+      superpixels_slico_ans <- superpixels_slico_ans$result
+      xx <- 0
+    }else{
+      if(xx==1){message("attempting to adjust `superpixel` size.......")}
+      # just get the result (in case we exit the while)
+      superpixels_slico_ans <- superpixels_slico_ans$result
+      new_sp <- try_sp[xx]
+      xx <- xx+1
+      
+    }
+  }
+  
+  if(is.null(superpixels_slico_ans)){stop("`superpixel` size not successfull, try a different value")}
+  return(superpixels_slico_ans)
+    
+}
+# run it
+superpixels_slico_ans <- try_superpixels_fn(input_image = im_temp, method = "slico", superpixel = sp_temp)
 ```
 
 what did we get back?
@@ -1471,25 +1547,45 @@ superpixels_slico_sf <- sf::st_read("../data/superpixels_slico_sf.gpkg")
 superpixels_features_df <- readr::read_csv("../data/superpixels_features_df.csv")
 ```
 
-check the training versus validation (dimmed) data with the superpixels overlaid
-
-```{r}
-terra::plot(class_rast_training, axes=F, legend = F)
-terra::plot(class_rast, alpha = 0.2, add = T, axes=F, legend = F)
-superpixels_slico_sf %>% terra::vect() %>% terra::plot(add = T)
-```
-
 we'll take the mean of the 0/1 values to get the proportion of the superpixel that overlaps with the location of a pile (think of this as the probability that a superpixel is a pile)
 
 ```{r}
-# get rid of superpixels that are in the validation
-training_superpixel_id <- terra::mask(
+# get list of all piles that intersect with a training tile so that full pile extent can be added to training
+training_pile_id <- terra::mask(
     superpixels_slico_sf %>% terra::vect()
     , sample_grid %>% terra::as.polygons()
   ) %>% 
   sf::st_as_sf() %>% 
+  sf::st_transform(sf::st_crs(slash_piles_polys)) %>% 
+  dplyr::select(superpixel_id) %>% 
+  sf::st_intersection(slash_piles_polys %>% dplyr::select(pile_id)) %>% 
   sf::st_drop_geometry() %>% 
-  dplyr::pull(superpixel_id)
+  dplyr::pull(pile_id) %>% 
+  unique()
+# unique training superpixel ids
+training_superpixel_id <- 
+  dplyr::bind_rows(
+    # superpixels that are in the training grid
+    terra::mask(
+        superpixels_slico_sf %>% terra::vect()
+        , sample_grid %>% terra::as.polygons()
+      ) %>% 
+      sf::st_as_sf() %>% 
+      dplyr::select(superpixel_id)
+    # superpixels of piles that intersect with training grid
+    , terra::mask(
+        superpixels_slico_sf %>% terra::vect()
+        , slash_piles_polys %>% 
+          dplyr::filter(pile_id %in% training_pile_id) %>% 
+          sf::st_transform(sf::st_crs(superpixels_slico_sf)) %>% 
+          terra::vect()
+      ) %>% 
+      sf::st_as_sf() %>% 
+      dplyr::select(superpixel_id)
+  ) %>% 
+  sf::st_drop_geometry() %>% 
+  dplyr::pull(superpixel_id) %>% 
+  unique()
 # extract classified values
 training_df <- class_rast %>%
   terra::extract(
@@ -1518,6 +1614,15 @@ training_df <- superpixels_slico_sf %>%
   dplyr::filter(!dplyr::if_any(dplyr::everything(), ~ is.na(.x))) # cant pass NA to classifier
 # what?
 training_df %>% dplyr::glimpse()
+# training_df %>% terra::vect() %>% terra::plot()
+```
+
+check the training versus validation (dimmed) data with the superpixels overlaid
+
+```{r}
+terra::plot(class_rast_training, axes=F, legend = F)
+terra::plot(class_rast, alpha = 0.2, add = T, axes=F, legend = F)
+training_df %>% terra::vect() %>% terra::plot(add = T)
 ```
 
 for superpixels covered by a pile, what is the distribution of percentage of superpixel that is covered by a pile?
@@ -1527,6 +1632,15 @@ training_df %>%
   dplyr::filter(pr_pile>0) %>% 
   dplyr::pull(pr_pile) %>% 
   summary()
+median_pile_pct_overlap <-
+  training_df %>% 
+  dplyr::filter(pr_pile>0) %>% 
+  dplyr::pull(pr_pile) %>% 
+  quantile(probs = 0.44, na.rm = T)
+```
+
+```{r, include = F, eval=FALSE}
+slash_piles_polys %>% dplyr::mutate(is_training = pile_id %in% training_pile_id) %>% sf::st_drop_geometry() %>% dplyr::count(is_training) %>% dplyr::mutate(pct = n/sum(n))
 ```
 
 check it on the map
@@ -1540,14 +1654,15 @@ training_df %>%
   ggplot2::theme_void()
 ```
 
-we can also see what it looks like if we include only pixels with >20% (~median value) of their area covered by a pile
+we can also see what it looks like if we include only pixels with >`r scales::percent(median_pile_pct_overlap,accuracy=1)` (~median value) of their area covered by a pile
 
 ```{r}
 training_df %>% 
   ggplot2::ggplot() +
-  ggplot2::geom_sf(ggplot2::aes(fill = pr_pile>0.2)) +
+  ggplot2::geom_sf(ggplot2::aes(fill = pr_pile>=median_pile_pct_overlap)) +
   ggplot2::geom_sf(data = slash_piles_polys, fill = NA, color = "blue", lwd = 0.3) +
   ggplot2::scale_fill_viridis_d(option = "magma", begin = 0.2, end = 0.8, na.value = "white") +
+  ggplot2::labs(fill = paste0("pr_pile>",scales::percent(median_pile_pct_overlap,accuracy=1))) +
   ggplot2::theme_void()
 ```
 
@@ -1592,6 +1707,8 @@ randomForest::varImpPlot(mod_rf)
 
 #### Predict values for validation superpixels
 
+Predict values for validation superpixels
+
 ```{r, warning=FALSE, message=FALSE, echo=FALSE, include=FALSE}
 remove(list = ls()[grep("_temp",ls())])
 gc()
@@ -1615,7 +1732,55 @@ validation_df <- validation_df %>%
   )
 ```
 
-plot predictions
+we'll also apply predictions to the full extent, but won't use this data for anything except to possibly identify piles that were missed in the field or image-annotation ground truthing
+
+```{r}
+# predict
+superpixels_slico_sf <-
+  superpixels_slico_sf %>% 
+  dplyr::left_join(
+    superpixels_slico_sf %>% 
+    dplyr::filter(!dplyr::if_any(dplyr::everything(), ~ is.na(.x))) %>% 
+    sf::st_drop_geometry() %>% 
+    dplyr::select(superpixel_id) %>% 
+    dplyr::mutate(
+      pr_pile_pred = stats::predict(
+        mod_rf
+        , newdata = superpixels_slico_sf %>% 
+          dplyr::filter(!dplyr::if_any(dplyr::everything(), ~ is.na(.x))) %>% 
+          sf::st_drop_geometry() %>% 
+          dplyr::select(
+            training_df %>% sf::st_drop_geometry() %>% dplyr::select(-c(superpixel_id,pr_pile)) %>% names()
+          )
+      )
+    )
+  )
+
+# combine pile predictions into polygons
+terra::mask(
+    superpixels_slico_sf %>% 
+      dplyr::filter(pr_pile_pred>=median_pile_pct_overlap) %>% 
+      sf::st_union(by_feature = F) %>% 
+      sf::st_cast("POLYGON") %>% 
+      sf::st_as_sf() %>% 
+      dplyr::mutate(pred_pile_id = dplyr::row_number() %>% as.factor()) %>% 
+      dplyr::select(pred_pile_id) %>% 
+      sf::st_transform(terra::crs(ortho_rast)) %>% 
+      terra::vect()
+    , ortho_rast %>% 
+        terra::subset(c("red","green","blue")) %>% 
+        cumsum() %>% 
+        terra::subset(3) %>% 
+        terra::subst(from = 0, to = 1, others = NA) %>% 
+        terra::as.polygons()
+      , inverse = T
+  ) %>% 
+  sf::st_as_sf() %>% 
+  # ggplot() + geom_sf()
+  sf::st_write("../data/predicted_piles_obia.gpkg", append = F)
+```
+
+plot predictions in validation area
 
 ```{r}
 validation_df %>% 
@@ -1626,23 +1791,83 @@ validation_df %>%
   ggplot2::theme_void()
 ```
 
-we can also see what it looks like if we include only pixels with >10% of their area covered by a pile
+we can also see what it looks like if we include only pixels with >`r scales::percent(median_pile_pct_overlap,accuracy=1)` (~median value) probability of being a pile
 
 ```{r}
 validation_df %>% 
   ggplot2::ggplot() +
-  ggplot2::geom_sf(ggplot2::aes(fill = pr_pile_pred>0.2)) +
+  ggplot2::geom_sf(ggplot2::aes(fill = pr_pile_pred>=median_pile_pct_overlap)) +
   ggplot2::geom_sf(data = slash_piles_polys, fill = NA, color = "blue", lwd = 0.3) +
   ggplot2::scale_fill_viridis_d(option = "magma", begin = 0.2, end = 0.8, na.value = "white") +
+  ggplot2::labs(fill = paste0("pr_pile>",scales::percent(median_pile_pct_overlap,accuracy=1))) +
   ggplot2::theme_void()
 ```
 
-evaluate model performance based on the Area under the Receiver Operating Characteristic (ROC) Curve (AUC) criterion (an AUC value of 0.5 can be interpreted as the model performing no better than a random prediction). Higher AUC values indicate that the model is better at predicting "absence" classes as "absence" (true negative) and "presence" classes as "presence" (true positive).
+#### Validation
+
+let's spatially combine superpixels with >`r scales::percent(median_pile_pct_overlap,accuracy=1)` (~median value) probability of being a pile
 
 ```{r}
-### coming soon
+predicted_piles_sf <- 
+  validation_df %>% 
+  dplyr::filter(pr_pile_pred>=median_pile_pct_overlap) %>% 
+  sf::st_union(by_feature = F) %>% 
+  sf::st_cast("POLYGON") %>% 
+  sf::st_as_sf() %>% 
+  dplyr::mutate(pred_pile_id = dplyr::row_number() %>% as.factor()) %>% 
+  dplyr::select(pred_pile_id)
+# remove areas outside of mask
+predicted_piles_sf <- 
+  terra::mask(
+    predicted_piles_sf %>% 
+      sf::st_transform(terra::crs(ortho_rast)) %>% 
+      terra::vect()
+    , ortho_rast %>% 
+        terra::subset(c("red","green","blue")) %>% 
+        cumsum() %>% 
+        terra::subset(3) %>% 
+        terra::subst(from = 0, to = 1, others = NA) %>% 
+        terra::as.polygons()
+      , inverse = T
+  ) %>% 
+  sf::st_as_sf()
 ```
 
+let's check those on the map compared to the actual validation piles
+
+```{r}
+ggplot2::ggplot() +
+  ggplot2::geom_sf(data = predicted_piles_sf, ggplot2::aes(fill = pred_pile_id), color = NA) +
+  ggplot2::geom_sf(data = slash_piles_polys %>% dplyr::filter(!pile_id %in% training_pile_id), fill = NA, color = "blue", lwd = 0.3) +
+  ggplot2::scale_fill_manual(
+    values = viridis::turbo(n = nrow(predicted_piles_sf), alpha = 0.8) %>% sample()
+  ) +
+  ggplot2::theme_light() +
+  ggplot2::theme(legend.position = "none")
+```
+
+and let's overlay all of this on the RGB imagery with the training piles in white, the validation piles in blue, and the predicted piles in orange
+
+```{r}
+terra::plotRGB(ortho_rast, stretch = "lin", colNA = "transparent")
+terra::plot(
+  slash_piles_polys %>% 
+    dplyr::filter(pile_id %in% training_pile_id) %>% 
+    sf::st_transform(terra::crs(ortho_rast)) %>% terra::vect()
+  , add = T, border = "white", col = NA, lwd = 1.2
+)
+terra::plot(
+  slash_piles_polys %>% 
+    dplyr::filter(!pile_id %in% training_pile_id) %>% 
+    sf::st_transform(terra::crs(ortho_rast)) %>% terra::vect()
+  , add = T, border = "blue", col = NA, lwd = 1.2
+)
+terra::plot(
+  predicted_piles_sf %>% 
+    sf::st_transform(terra::crs(ortho_rast)) %>% terra::vect()
+  , add = T, border = "orangered", col = NA, lwd = 1.2
+)
+```
 
 ### `SuperpixelImageSegmentation` package SLICAP clustering
 
