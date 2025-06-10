@@ -717,7 +717,7 @@ ggplot2::ggsave("../data/pile_tiles_kmeans6.jpeg", height = 10.5, width = 8)
 
 there is no discernible pattern between the kmeans classes and the slash piles because the lighting and conditions around the piles are not consistent. this result also highlights the challenges we'll likely face with pixel-based classification methods
 
-## Pixel-based: supervised classification
+## Pixel-based: supervised classification{#pixel_class}
 
 we'll start with a pixel-based classification using the image-annotated pile polygons to train a classification model
 
@@ -1047,7 +1047,20 @@ PresenceAbsence::auc.roc.plot(
 )
 ```
 
-now lets check the confusion matrix of the pixel-based approach
+now lets check the confusion matrix of the pixel-based approach where we evaluate omission rate (false negative rate or miss rate), commission rate (false positive rate), precision, recall (detection rate), and the F-score metric. As a reminder, true positive ($TP$) instances correctly match ground truth instances with a prediction, commission tree predictions do not match a ground truth tree (false positive; $FP$), and omissions are ground truth instances for which no predictions match (false negative; $FN$)
+
+$$\textrm{omission rate} = \frac{FN}{TP+FN}$$
+
+$$\textrm{commission rate} = \frac{FP}{TP+FP}$$
+
+$$\textrm{precision} = \frac{TP}{TP+FP}$$
+
+$$\textrm{recall} = \frac{TP}{TP+FN}$$
+
+$$
+\textrm{F-score} = 2 \times \frac{\bigl(precision \times recall \bigr)}{\bigl(precision + recall \bigr)}
+$$
+
 
 ```{r}
 confusion_matrix_temp <-
@@ -1832,6 +1845,15 @@ predicted_piles_sf <-
       , inverse = T
   ) %>% 
   sf::st_as_sf()
+
+```
+
+```{r, include=F, eval=FALSE}
+predicted_piles_sf %>% sf::st_write("../data/predicted_piles_sf.gpkg", append = F)
+```
+
+```{r, include=F, eval=FALSE}
+predicted_piles_sf <- sf::st_read("../data/predicted_piles_sf.gpkg")
 ```
 
 let's check those on the map compared to the actual validation piles
@@ -2125,7 +2147,7 @@ ground_truth_prediction_match_ans <- ground_truth_prediction_match(
   , gt_id = "pile_id"
   , predictions = predicted_piles_sf
   , pred_id = "pred_pile_id"
-  , min_iou_pct = 0.25
+  , min_iou_pct = 0.05
 )
 ```
 
@@ -2150,48 +2172,243 @@ pal_match_grp = c(
 ggplot2::ggplot() +
   ggplot2::geom_sf(
     data = 
-      ground_truth_temp$crowns %>% 
+      slash_piles_polys %>% 
+      dplyr::filter(!pile_id %in% training_pile_id) %>% 
+      sf::st_transform(sf::st_crs(predicted_piles_sf)) %>% 
         dplyr::left_join(
           ground_truth_prediction_match_ans %>% 
-            dplyr::select(treeID,match_grp)
-          , by = "treeID"
+            dplyr::select(pile_id,match_grp)
+          , by = "pile_id"
         )
     , mapping = ggplot2::aes(fill = match_grp)
     , color = NA ,alpha=0.7
   ) + 
   ggplot2::geom_sf(
     data =
-      ans_crowns_no_mask %>%
+      predicted_piles_sf %>%
         dplyr::left_join(
           ground_truth_prediction_match_ans %>%
-            dplyr::select(treeID_pred,match_grp)
-          , by = dplyr::join_by(treeID==treeID_pred)
+            dplyr::select(pred_pile_id,match_grp)
+          , by = "pred_pile_id"
         )
     , mapping = ggplot2::aes(fill = match_grp, color = match_grp)
     , alpha = 0
-    , lwd = 1.2
+    , lwd = 1.1
   ) +
   ggplot2::scale_fill_manual(values = pal_match_grp, name = "") +
   ggplot2::scale_color_manual(values = pal_match_grp, name = "") +
-  ggplot2::theme_void() +
+  ggplot2::theme_light() +
   ggplot2::guides(
-    fill = ggplot2::guide_legend(override.aes = list(color = c(NA,NA,viridis::cividis(3)[2])))
+    fill = ggplot2::guide_legend(override.aes = list(color = c(NA,NA,pal_match_grp["commission"])))
     , color = "none"
   )
 ```
 
+let's quickly look at the IoU values on the true positives
+
+```{r}
+ground_truth_prediction_match_ans %>% dplyr::select(iou) %>% summary()
+```
+
+let's make a function to aggregate the instances to pass to the xxxx function we defined above
+
+```{r}
+agg_ground_truth_match <- function(ground_truth_prediction_match_ans) {
+  if(nrow(ground_truth_prediction_match_ans)==0){return(NULL)}
+  if( !(names(ground_truth_prediction_match_ans) %>% stringr::str_equal("match_grp") %>% any()) ){stop("ground_truth_prediction_match_ans must contain `match_grp` column")}
+  # count by match group
+  agg <- ground_truth_prediction_match_ans %>% 
+    dplyr::count(match_grp) %>% 
+    dplyr::mutate(
+      match_grp = dplyr::case_match(
+        match_grp
+        , "true positive"~"tp"
+        , "commission"~"fp"
+        , "omission"~"fn"
+      )
+    )
+  # true positive, false positive, false negative rates
+  return_df <- dplyr::tibble(match_grp = c("tp","fp","fn")) %>% 
+    dplyr::left_join(agg, by = "match_grp") %>% 
+    dplyr::mutate(dplyr::across(.cols = c(n), .fn = ~dplyr::coalesce(.x,0))) %>% 
+    tidyr::pivot_wider(
+      names_from = match_grp
+      , values_from = c(n)
+      , names_glue = "{match_grp}_{.value}"
+    )
+  # rates, precision, recall, f-score
+  return_df <- return_df %>% confusion_matrix_scores_fn()
+  # return
+  return(return_df)
+}
+```
+
+finally, let's check our confusion matrix
+
+```{r}
+confusion_matrix_temp <- agg_ground_truth_match(ground_truth_prediction_match_ans)
+confusion_matrix_scores_temp <- confusion_matrix_scores_fn(confusion_matrix_temp)
+# plot
+confusion_matrix_temp %>% 
+  dplyr::select(tidyselect::ends_with("_n")) %>% 
+  tidyr::pivot_longer(dplyr::everything()) %>% 
+  dplyr::mutate(
+    presence = ifelse(name %in% c("tp_n", "fn_n"),1,0)
+    , estimate = ifelse(name %in% c("tp_n", "fp_n"),1,0)
+  ) %>% 
+  dplyr::mutate(
+    is_false = as.factor(ifelse(presence!=estimate,1,0))
+    , presence_fact = factor(presence,levels = 0:1,labels = c("Observed Absent", "Observed Present"))
+    , estimate_fact = factor(estimate,levels = 0:1,labels = c("Predicted Absent", "Predicted Present"))
+    , pct = value/sum(value)
+  ) %>% 
+  ggplot(mapping = aes(y = estimate_fact, x = presence_fact)) +
+  geom_tile(aes(fill = is_false), color = "white",alpha=0.8) +
+  geom_text(aes(label = scales::comma(value,accuracy=1)), vjust = 1,size = 8) +
+  geom_text(aes(label = scales::percent(pct,accuracy=0.1)), vjust = 3.5, size=5) +
+  scale_fill_manual(values= c("turquoise","tomato2")) +
+  scale_x_discrete(position = "top") +
+  labs(
+    y = "Predicted"
+    , x = "Observed"
+    , subtitle = paste0(
+      "True positive rate (recall) = "
+        , confusion_matrix_scores_temp$recall %>% 
+          scales::percent(accuracy = 0.1)
+      , "\nPrecision (PPV) = "
+        , confusion_matrix_scores_temp$precision %>% 
+          scales::percent(accuracy = 0.1)
+      , "\nF1-score = "
+        , confusion_matrix_scores_temp$f_score %>% 
+          scales::percent(accuracy = 0.1)
+    )
+  ) +
+  theme_light() + 
+  theme(
+    legend.position = "none"
+    , panel.grid = element_blank()
+    , plot.title = element_text(size = 9)
+    , plot.subtitle = element_text(size = 9)
+  )
+```
+
+compared to our pixel-based [approach above](#pixel_class), we improved the recall rate meaning that we correctly identified actual piles more often. However, this improved detection rate came at the expense of lowered precision as we incorrectly predicted piles at locations were no piles were actually observed. Combined, the OBIA approach had lower overall accuracy but improved detection rate and did so in a manner that actual objects were predicted that more closely align with the actual form of slash piles on the ground.
 
 ### `SuperpixelImageSegmentation` package SLICAP clustering
 
 we'll test out the `SuperpixelImageSegmentation` [package](https://github.com/mlampros/SuperpixelImageSegmentation) which was developed specifically to implement the SLIC Superpixels and Affinity Propagation (AP) Clustering method of image segmentation ([Zhou 2015](https://www.ijsr.net/archive/v4i4/SUB152869.pdf)). This method first uses the SLIC superpixel algorithm to form an over-segmentation of an image, constructs a similarity score based on the features of superpixels, and uses the AP algorithm to cluster superpixels. All of these steps are performed in a semi-automated manner as the user does not need to specify the number of clusters as required by other methods (e.g. Kmeans). 
 
-```{r}
+```{r, include = F, eval = F}
 # readImage on our RGB raster for segmentation
 im_temp <- OpenImageR::readImage(fpath_seg)
 # initiate and perform segmentation of images based on superpixels, affinity propagation and kmeans clustering
 init <- SuperpixelImageSegmentation::Image_Segmentation$new()
 superpixels_slicap_ans <- init$spixel_segmentation(
   input_image = im_temp
+  # a numeric value specifying the number of superpixels
+  , superpixel = 644
+  # Either "slic" or "slico"
+  , method = "slico"
+  # a character string specifying the kmeans method. If not empty ("") then it can be either "kmeans" or "mini_batch_kmeans"
+  , kmeans_method = ""
+  # If TRUE then the affinity propagation image data will be computed and returned
+  , AP_data = TRUE
+  # If TRUE then the median will be used rather than the mean value for the inner computations (see the details section for more information)
+  , use_median = TRUE
+  # a numeric value specifying the weight for the "L" channel of the image (the weights of the three channels based on the "CIELAB color space")
+  , sim_wL = 3
+  # a numeric value specifying the weight for the "A" channel of the image (the weights of the three channels based on the "CIELAB color space")
+  , sim_wA = 10
+  # a numeric value specifying the weight for the "B" channel of the image (the weights of the three channels based on the "CIELAB color space")
+  , sim_wB = 10
+  # numeric value specifying the colorradius: 
+    ## adjusts the number of clusters, and if its value is low, the number of targets would increase, which leads to more detailed segmentation results
+  , sim_color_radius = 10
+  , verbose = TRUE
+)
+```
+
+make a function to safely implement the methodology and automatically adjust the number of superpixels to attempt to return successful result
+
+```{r}
+try_superpixels_fn <- function(
+  input_image
+  , method = "slico" 
+  # number of superpixels to use
+  , superpixel = 200
+  , kmeans_method = ""
+  , AP_data = T
+  , use_median = T
+  , sim_wL = 3
+  , sim_wA = 10
+  , sim_wB = 10
+  , sim_color_radius = 10
+  , verbose = T
+) {
+  # make sure sp is integer
+  new_sp <- dplyr::coalesce(superpixel, 200) %>% floor()
+  # make a list of backup sp
+  try_sp <- seq(from = max(floor(new_sp*0.95),10), to = max(floor(new_sp*1.05),10), by = 1) %>% 
+    base::setdiff(new_sp) %>% 
+    sample()
+  
+  # safe it
+  safe_superpixels <- purrr::safely(OpenImageR::superpixels)
+  
+  # while loop to handle superpixel errors
+  xx <- 1
+  
+  
+  # initiate and perform segmentation of images based on superpixels, affinity propagation and kmeans clustering
+  init <- SuperpixelImageSegmentation::Image_Segmentation$new()
+  safe_spixel_segmentation <- purrr::safely(init$spixel_segmentation)
+  
+  while(xx!=0 && xx<length(try_sp)) {
+    # superpixels
+    superpixels_slicap_ans <- safe_spixel_segmentation(
+      input_image = input_image
+      , superpixel = new_sp
+      , method = method
+      , kmeans_method = kmeans_method
+      , AP_data = AP_data
+      , use_median = use_median
+      , sim_wL = sim_wL
+      , sim_wA = sim_wA
+      , sim_wB = sim_wB
+      , sim_color_radius = sim_color_radius
+      , verbose = verbose
+    )
+    
+    # check
+    if(!is.null(superpixels_slicap_ans$error) && 
+       stringr::str_detect(as.character(superpixels_slicap_ans$error), "median")
+    ){
+      stop(superpixels_slicap_ans$error)
+    }else if(is.null(superpixels_slicap_ans$error)){
+      # just get the result
+      superpixels_slicap_ans <- superpixels_slicap_ans$result
+      xx <- 0
+    }else{
+      if(xx==1){message("attempting to adjust `superpixel` size.......")}
+      # just get the result (in case we exit the while)
+      superpixels_slicap_ans <- superpixels_slicap_ans$result
+      new_sp <- try_sp[xx]
+      xx <- xx+1
+      
+    }
+  }
+  
+  if(is.null(superpixels_slicap_ans)){stop("`superpixel` size not successfull, try a different value")}
+  return(superpixels_slicap_ans)
+    
+}
+```
+
+run it
+
+```{r}
+superpixels_slicap_ans <- try_superpixels_fn(
+  input_image = OpenImageR::readImage(fpath_seg)
   # a numeric value specifying the number of superpixels
   , superpixel = 600
   # Either "slic" or "slico"
@@ -2230,11 +2447,21 @@ OpenImageR::imageShow(superpixels_slicap_ans$AP_image_data)
 ok, let's increase the number of `superpixel` and decrease the `sim_color_radius` to get finer detail (but significantly increase processing time)
 
 ```{r}
-# readImage on our RGB raster for segmentation
-im_temp <- OpenImageR::readImage(fpath_seg)
-# initiate and perform segmentation of images based on superpixels, affinity propagation and kmeans clustering
-init <- SuperpixelImageSegmentation::Image_Segmentation$new()
-superpixels_slicap_ans <- init$spixel_segmentation(
+## number of superpixels to use
+## set this to extent/minimum expected pile area?
+sp_temp <- floor(
+    # raster area
+    ( terra::cellSize(ortho_rast[[1]])[1]*terra::ncell(ortho_rast[[1]]) ) / 
+    # expected pile area
+      (
+        slash_piles_polys %>% dplyr::mutate(area = sf::st_area(.) %>% as.numeric()) %>% 
+        dplyr::pull(area) %>% 
+        quantile(probs = 0.33)
+      )
+  ) %>% 
+  max(200) # 200 = function default
+# try it
+superpixels_slicap_ans <- try_superpixels_fn(
   input_image = im_temp
   # a numeric value specifying the number of superpixels
   , superpixel = sp_temp # 3333
