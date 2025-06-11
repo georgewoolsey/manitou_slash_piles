@@ -26,6 +26,11 @@ To attempt to identify slash piles from the CHM/DSM, we can use watershed segmen
 We'll use `cloud2trees::cloud2raster()` to process the raw point cloud data
 
 ```{r, include=FALSE,eval=FALSE}
+  # "c:/data/usfs/manitou_slash_piles/data/error_point_cloud_processing_temp/00_grid"
+lidR::readLAS("D:\\PFDP_Data\\las_errors/las_error1.las", select = "xyz") %>%
+ lidR::decimate_points(algorithm = lidR::random(50)) %>% lidR::plot()
+
+
 # something bad is happening with this point cloud
 errors_temp <- sf::st_read("D:\\PFDP_Data\\las_errors/error_areas.shp") %>% 
   dplyr::rename_with(tolower)
@@ -90,14 +95,12 @@ las <- lidR::segment_shapes(
 lidR::point_eigenvalues()
 ```
 
-
-```{r,eval=FALSE}
+```{r}
 if(!dir.exists("../data/point_cloud_processing_delivery")){
   cloud2raster_ans <- cloud2trees::cloud2raster(
     output_dir = "../data"
     , input_las_dir = "D:\\PFDP_Data\\p4pro_images\\P4Pro_06_17_2021_half_half_optimal\\2_densification\\point_cloud"
-    , max_ctg_pts = 9e+07
-    , accuracy_level = 3
+    , accuracy_level = 2
     , keep_intrmdt = T
     , dtm_res_m = 0.5
     , chm_res_m = 0.2
@@ -120,13 +123,155 @@ gc()
 
 let's check out the DTM
 
-```{r, include=FALSE,eval=FALSE}
-cloud2raster_ans$chm_rast %>% 
-  # terra::clamp(lower = 2) %>% 
-  # terra::summary()
+```{r}
+cloud2raster_ans$dtm_rast %>% 
   terra::aggregate(fact = 2) %>%  #, fun = "median", cores = lasR::half_cores(), na.rm = T) %>% 
-  terra::plot(col = viridis::viridis(100), add = T)
+  terra::plot(axes = F)
+```
 
+```{r, include=FALSE, eval=TRUE}
+ggplot2::ggsave("../data/dtm.jpeg", height = 8, width = 10.5)
 ```
 
 and CHM
+
+```{r}
+cloud2raster_ans$chm_rast %>% 
+  terra::aggregate(fact = 2) %>%  #, fun = "median", cores = lasR::half_cores(), na.rm = T) %>% 
+  terra::plot(col = viridis::plasma(100), axes = F)
+```
+
+```{r, include=FALSE, eval=TRUE}
+ggplot2::ggsave("../data/chm.jpeg", height = 8, width = 10.5)
+```
+
+### DTM and CHM + piles
+
+let's visually inspect the DTM and CHM with the pile outlines overlaid
+
+
+```{r}
+p_fn_temp <- function(
+    rn
+    , df = slash_piles_polys
+    , rast = cloud2raster_ans$dtm_rast
+    , crs = terra::crs(cloud2raster_ans$dtm_rast)
+    , my_title = ""
+    , vopt = "viridis"
+    , lim = NULL
+) {
+  # scale the buffer based on the largest
+    d_temp <- df %>%
+      dplyr::arrange(tolower(comment), desc(diameter)) %>% 
+      dplyr::slice(rn) %>% 
+      sf::st_transform(crs)
+    
+    # plt classifier
+    # convert to stars
+    comp_st <- rast %>%  
+      terra::crop(
+        d_temp %>% sf::st_buffer(20) %>% terra::vect()
+      ) %>% 
+      terra::as.data.frame(xy = T) %>% 
+      dplyr::rename(f=3)
+    
+    # ggplot
+    comp_temp <- ggplot2::ggplot() +
+      ggplot2::geom_tile(data = comp_st, ggplot2::aes(x=x,y=y,fill=f)) +
+      ggplot2::geom_sf(data = d_temp, fill = NA, color = "gray33", lwd = 0.4) +
+      ggplot2::scale_x_continuous(expand = c(0, 0)) +
+      ggplot2::scale_y_continuous(expand = c(0, 0)) +
+      ggplot2::labs(
+        x = ""
+        , y = ""
+        , subtitle = my_title
+      ) +
+      ggplot2::theme_void() +
+      ggplot2::theme(
+        legend.position = "none" # c(0.5,1)
+        , legend.margin = margin(0,0,0,0)
+        , legend.text = element_text(size = 8)
+        , legend.title = element_text(size = 8)
+        , legend.key = element_rect(fill = "white")
+        # , plot.title = ggtext::element_markdown(size = 10, hjust = 0.5)
+        , plot.title = element_text(size = 8, hjust = 0.5, face = "bold")
+        , plot.subtitle = element_text(size = 6, hjust = 0.5, face = "italic")
+      )
+  if(!is.null(lim)){
+    comp_temp <- comp_temp + 
+      ggplot2::scale_fill_viridis_c(option = vopt, limits = lim)
+  }else{
+    comp_temp <- comp_temp + 
+      ggplot2::scale_fill_viridis_c(option = vopt)
+  }
+    
+  plt_temp <- comp_temp
+  return(list("plt"=plt_temp,"d"=d_temp))
+}
+
+# p_fn_temp(
+#   rn = 5
+#   # , lim = c(floor(terra::minmax(cloud2raster_ans$dtm_rast)[1]*0.98), floor(terra::minmax(cloud2raster_ans$dtm_rast)[2]*1.02))
+# )
+# p_fn_temp(
+#   rn = 11
+#   , rast = cloud2raster_ans$chm_rast
+#   , vopt = "plasma"
+# )
+# combine 3
+plt_combine_temp <- function(
+    rn
+    , df = slash_piles_polys %>% dplyr::filter(!is.na(comment))
+    , rast1 = cloud2raster_ans$dtm_rast
+    , title1 = "DTM"
+    , vopt1 = "viridis"
+    , rast2 = cloud2raster_ans$chm_rast
+    , title2 = "DSM"
+    , vopt2 = "plasma"
+    , crs = terra::crs(cloud2raster_ans$dtm_rast)
+) {
+  # composite 1
+  ans1 <- p_fn_temp(
+    rn = rn
+    , df = df
+    , rast = rast1
+    , my_title = title1
+    , crs = crs
+    , vopt = vopt1
+  )
+  # composite 2
+  ans2 <- p_fn_temp(
+    rn = rn
+    , df = df
+    , rast = rast2
+    , my_title = title2
+    , crs = crs
+    , vopt = vopt2
+  )
+  # plt rgb
+    rgb_temp <-
+      ortho_plt_fn(ans1$d) + 
+      ggplot2::geom_sf(data = ans1$d, fill = NA, color = "white", lwd = 0.3)
+  # combine
+    r <- ans1$plt + ans2$plt + rgb_temp
+    return(r)
+}
+
+# plt_combine_temp(2)
+
+# add pile locations
+plt_list_rast_comp <- sample(1:nrow(slash_piles_polys %>% dplyr::filter(!is.na(comment))),10) %>% 
+  purrr::map(plt_combine_temp)
+# plt_list_rast_comp[[2]]
+```
+
+combine the plots for a few piles
+
+```{r, height = 10.5, width = 5}
+patchwork::wrap_plots(
+  plt_list_rast_comp
+  , ncol = 2
+)
+ggplot2::ggsave("../data/pile_tiles_rast.jpeg", height = 8.5, width = 10.5)
+```
+

@@ -1280,7 +1280,7 @@ fpath_class <- file.path(tempdir_temp, "class.tif")
 # write
 terra::writeRaster(class_rast_training, filename = fpath_train, overwrite = T)
 terra::writeRaster(
-  pred_rast %>% terra::subset(c("red","green","blue"))
+  ortho_rast %>% terra::subset(c("red","green","blue"))
   , filename = fpath_seg
   , overwrite = T
 )
@@ -1746,7 +1746,7 @@ validation_df <- validation_df %>%
   )
 ```
 
-we'll also apply predictions to the full extent, but won't use this data for anything except to possibly identify piles that were missed in the field or image-annotation ground truthing
+we'll also apply predictions to the full extent, but won't use this data for anything except to possibly identify piles that were missed in the field or image-annotation ground truth comparison
 
 ```{r}
 # predict
@@ -1816,6 +1816,8 @@ validation_df %>%
   ggplot2::labs(fill = paste0("pr_pile>",scales::percent(median_pile_pct_overlap,accuracy=1))) +
   ggplot2::theme_void()
 ```
+
+to filter potential false positives at this stage, we could apply additional statistical filters to the detected objects or their bounding boxes to remove detections that do not meet certain density or size criteria
 
 #### Validation
 
@@ -2446,7 +2448,9 @@ OpenImageR::imageShow(superpixels_slicap_ans$AP_image_data)
 
 ok, let's increase the number of `superpixel` and decrease the `sim_color_radius` to get finer detail (but significantly increase processing time)
 
-```{r}
+**this takes so long, we aren't going to show the result but we'll leave the code for reference**
+
+```{r, eval=FALSE}
 ## number of superpixels to use
 ## set this to extent/minimum expected pile area?
 sp_temp <- floor(
@@ -2456,13 +2460,13 @@ sp_temp <- floor(
       (
         slash_piles_polys %>% dplyr::mutate(area = sf::st_area(.) %>% as.numeric()) %>% 
         dplyr::pull(area) %>% 
-        quantile(probs = 0.33)
+        quantile(probs = 0.77)
       )
   ) %>% 
   max(200) # 200 = function default
 # try it
 superpixels_slicap_ans <- try_superpixels_fn(
-  input_image = im_temp
+  input_image = OpenImageR::readImage(fpath_seg)
   # a numeric value specifying the number of superpixels
   , superpixel = sp_temp # 3333
   # Either "slic" or "slico"
@@ -2481,7 +2485,7 @@ superpixels_slicap_ans <- try_superpixels_fn(
   , sim_wB = 10
   # numeric value specifying the colorradius: 
     ## adjusts the number of clusters, and if its value is low, the number of targets would increase, which leads to more detailed segmentation results
-  , sim_color_radius = 2
+  , sim_color_radius = 3
   , verbose = TRUE
 )
 ```
@@ -2497,7 +2501,7 @@ superpixels_slicap_ans$AP_image_data[,,2] %>% c() %>% unique() %>% length()
 superpixels_slicap_ans$AP_image_data[,,3] %>% c() %>% unique() %>% length()
 ```
 
-```{r}
+```{r, eval=FALSE}
 # use the ortho template so we get the projection and then fill with values
 rast_temp <- ortho_rast %>% terra::subset(1)
 rast_temp[] <- superpixels_slicap_ans$AP_image_data[,,1] %>% terra::rast()
@@ -2526,7 +2530,7 @@ terra::plot(
 
 it looks like the automatic clustering did not consistently classify the pile locations. let's check the distribution of the clusters within the pile locations
 
-```{r}
+```{r, eval=FALSE}
 tab_temp <- rast_temp %>% 
   terra::extract(
     slash_piles_polys %>% 
@@ -2550,7 +2554,7 @@ tab_temp %>%
 
 we can see this if we look at only the clusters that overlap with at least 10% of the piles
 
-```{r}
+```{r, eval=FALSE}
 ### 
 terra::subst(
   rast_temp
@@ -2576,7 +2580,7 @@ to do this, we update the `kmeans_*` parameters
 
 **this took 40 minutes with kmeans_method = "kmeans"**
 
-```{r}
+```{r, eval=FALSE}
 # initiate and perform segmentation of images based on superpixels, affinity propagation and kmeans clustering
 # ?SuperpixelImageSegmentation::Image_Segmentation
 init <- SuperpixelImageSegmentation::Image_Segmentation$new()
@@ -2613,13 +2617,13 @@ superpixels_slicap_ans <- init$spixel_segmentation(
 
 what did we get back?
 
-```{r}
+```{r, eval=FALSE}
 superpixels_slicap_ans %>% str()
 ```
 
 let's see the clustering output based on **Superpixels + AP + Kmeans** and we'll add the pile outlines in blue
 
-```{r}
+```{r, eval=FALSE}
 # # Superpixels + AP
 # OpenImageR::imageShow(superpixels_slicap_ans$AP_image_data)
 # # Superpixels + AP + Kmeans
@@ -2652,7 +2656,7 @@ terra::plot(
 
 let's check the distribution of the clusters within the pile locations
 
-```{r}
+```{r, eval=FALSE}
 tab_temp <- rast_temp %>% 
   terra::extract(
     slash_piles_polys %>% 
@@ -2676,7 +2680,7 @@ tab_temp %>%
 
 did anything change with the **Superpixels + AP** output?
 
-```{r}
+```{r, eval=FALSE}
 # use the ortho template so we get the projection and then fill with values
 rast_temp <- ortho_rast %>% terra::subset(1)
 rast_temp[] <- superpixels_slicap_ans$AP_image_data[,,1] %>% terra::rast()
