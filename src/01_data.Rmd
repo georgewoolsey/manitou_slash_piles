@@ -104,7 +104,7 @@ Orthomosaic `tif` files from the UAS flight imagery that were created in [Agisof
     }
     ## apply the function
     ortho_list_temp <- 1:length(ortho_list_temp) %>% 
-      purrr::map(function(x){change_res_fn(ortho_list_temp[[x]], my_res=0.25)})
+      purrr::map(function(x){change_res_fn(ortho_list_temp[[x]], my_res=0.1)})
     
     # terra::res(ortho_list_temp[[1]])
     
