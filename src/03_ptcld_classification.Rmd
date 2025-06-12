@@ -307,8 +307,52 @@ piles_temp <- slash_piles_polys %>%
 # rgb
 rgb_temp <- buff_temp %>% 
   sf::st_transform(crs_temp) %>% 
-  ortho_plt_fn(buffer = 0) + 
-  ggplot2::geom_sf(data = piles_temp %>% sf::st_transform(crs_temp), fill = NA, color = "white", lwd = 0.3)
-rgb_temp
+  ortho_plt_fn(buffer = 0) 
+# rgb_temp
+rgb_temp + 
+  ggplot2::geom_sf(data = piles_temp %>% sf::st_transform(crs_temp), fill = NA, color = "orangered2", lwd = 0.9)
+ggplot2::ggsave("../data/rgbtesttest.jpg", height = 7, width = 7.5)
+# dtm
+dtm_temp <- 
+  cloud2raster_ans$dtm_rast %>%  
+  terra::crop(
+    buff_temp %>% 
+      sf::st_transform(crs_temp) %>% 
+      terra::vect()
+  ) %>% 
+  terra::as.data.frame(xy = T) %>% 
+  dplyr::rename(f=3) %>% 
+  ggplot2::ggplot() +
+  ggplot2::geom_tile(ggplot2::aes(x=x,y=y,fill=f)) +
+  ggplot2::scale_fill_viridis_c(option = "viridis") +
+  ggplot2::scale_x_continuous(expand = c(0, 0)) +
+  ggplot2::scale_y_continuous(expand = c(0, 0)) +
+  ggplot2::theme_void() +
+  ggplot2::theme(legend.position = "none")
+dtm_temp +
+  ggplot2::geom_sf(data = piles_temp %>% sf::st_transform(crs_temp), fill = NA, color = "orangered2", lwd = 0.9)
+ggplot2::ggsave("../data/dtmtesttest.jpg", height = 7, width = 7.5)
+# chm
+chm_temp <- 
+  cloud2raster_ans$chm_rast %>%  
+  terra::crop(
+    buff_temp %>% 
+      sf::st_transform(crs_temp) %>% 
+      terra::vect()
+  ) %>% 
+  terra::as.data.frame(xy = T) %>% 
+  dplyr::rename(f=3) %>% 
+  ggplot2::ggplot() +
+  ggplot2::geom_tile(ggplot2::aes(x=x,y=y,fill=f)) +
+  # harrypotter::scale_fill_hp("mischief") +
+  # ggplot2::scale_fill_viridis_c(option = "mako", direction = -1) +
+  ggplot2::scale_fill_distiller(palette = "BrBG", direction = 1) +
+  ggplot2::scale_x_continuous(expand = c(0, 0)) +
+  ggplot2::scale_y_continuous(expand = c(0, 0)) +
+  ggplot2::theme_void() +
+  ggplot2::theme(legend.position = "none")
+chm_temp +
+  ggplot2::geom_sf(data = piles_temp %>% sf::st_transform(crs_temp), fill = NA, color = "orangered2", lwd = 0.9)
+ggplot2::ggsave("../data/chmtesttest.jpg", height = 7, width = 7.5)
 ```
 
