@@ -294,6 +294,84 @@ We'll first attempt to detect slash piles using raster-based methods with the DT
 
 When used for individual tree detection (ITD), this technique treats the CHM as a topographic surface, where local maxima represent tree tops and valleys represent crown boundaries. A "water source" is conceptually placed at each local lowest point, and the surface is "flooded." Barriers are generated where different "water sources" meet, forming watershed lines that delineate individual tree crowns.
 
+```{r, include=FALSE, eval=TRUE}
+# quick function to ingest a sf data.frame with geometry features for each row
+# and return a bbox for each row-level geometry
+sf_bbox_by_row <- function(
+  df
+  , corner = "" # ul,ll,ur,lr
+) {
+  if(!inherits(df,"sf")){stop("must be sf class object")}
+  nd <- df %>% 
+    sf::st_set_geometry("geometry") %>% 
+    dplyr::rowwise() %>% 
+    dplyr::mutate(
+      xmin_temp = sf::st_bbox(geometry)[1]
+      , ymin_temp = sf::st_bbox(geometry)[2]
+      , xmax_temp = sf::st_bbox(geometry)[3]
+      , ymax_temp = sf::st_bbox(geometry)[4]
+    )
+
+  if(corner == "ul"){
+    nd %>% 
+    sf::st_drop_geometry() %>% 
+    sf::st_as_sf(
+      coords = c("xmin_temp","ymax_temp")
+      , remove = F
+      , crs = sf::st_crs(df)
+    ) %>% 
+    dplyr::ungroup() %>%
+    dplyr::select(-c(xmin_temp,ymin_temp,xmax_temp,ymax_temp))
+  }else if(corner == "ll"){
+    nd %>% 
+    sf::st_drop_geometry() %>% 
+    sf::st_as_sf(
+      coords = c("xmin_temp","ymin_temp")
+      , remove = F
+      , crs = sf::st_crs(df)
+    ) %>% 
+    dplyr::ungroup() %>%
+    dplyr::select(-c(xmin_temp,ymin_temp,xmax_temp,ymax_temp))
+  }else if(corner == "ur"){
+    nd %>% 
+    sf::st_drop_geometry() %>% 
+    sf::st_as_sf(
+      coords = c("xmax_temp","ymax_temp")
+      , remove = F
+      , crs = sf::st_crs(df)
+    ) %>% 
+    dplyr::ungroup() %>%
+    dplyr::select(-c(xmin_temp,ymin_temp,xmax_temp,ymax_temp))
+  }else if(corner == "lr"){
+    nd %>% 
+    sf::st_drop_geometry() %>% 
+    sf::st_as_sf(
+      coords = c("xmax_temp","ymin_temp")
+      , remove = F
+      , crs = sf::st_crs(df)
+    ) %>% 
+    dplyr::ungroup() %>%
+    dplyr::select(-c(xmin_temp,ymin_temp,xmax_temp,ymax_temp))
+  }else{
+    nd %>% 
+    dplyr::mutate(
+      geometry = sf::st_sfc(
+          sf::st_point(c(xmin_temp,ymin_temp)) # lower_left_pt
+          , sf::st_point(c(xmax_temp,ymax_temp)) # upper_right_pt
+        ) %>% 
+        sf::st_bbox() %>% 
+        sf::st_as_sfc()
+    ) %>%
+    dplyr::ungroup() %>%
+    sf::st_set_geometry("geometry") %>%
+    sf::st_set_crs(sf::st_crs(df)) %>% 
+    dplyr::select(-c(xmin_temp,ymin_temp,xmax_temp,ymax_temp))
+  }
+}
+
+```
+
+
 ```{r}
 pile_id_temp <- 73
 crs_temp <- terra::crs(ortho_rast)
@@ -303,14 +381,26 @@ buff_temp <- slash_piles_polys %>% dplyr::filter(pile_id == pile_id_temp) %>%
   sf::st_buffer(35, endCapStyle = "SQUARE")
 # piles filter
 piles_temp <- slash_piles_polys %>% 
-  sf::st_intersection(buff_temp)
+  sf::st_intersection(buff_temp) %>% 
+  dplyr::mutate(rn = dplyr::row_number())
+piles_bbox_temp <- piles_temp %>% sf_bbox_by_row(corner = "ul")
+  
 # rgb
 rgb_temp <- buff_temp %>% 
   sf::st_transform(crs_temp) %>% 
   ortho_plt_fn(buffer = 0) 
 # rgb_temp
 rgb_temp + 
-  ggplot2::geom_sf(data = piles_temp %>% sf::st_transform(crs_temp), fill = NA, color = "orangered2", lwd = 0.9)
+  ggplot2::geom_sf(
+    data = piles_temp %>% sf::st_transform(crs_temp)
+    , fill = NA, color = "orangered2", lwd = 0.8
+  ) +
+  ggplot2::geom_sf_label(
+    data = piles_bbox_temp %>% sf::st_transform(crs_temp)
+    , ggplot2::aes(label = rn, fontface = "bold")
+    , vjust = 0, hjust = 0.5
+    # , color = "white"
+  )
 ggplot2::ggsave("../data/rgbtesttest.jpg", height = 7, width = 7.5)
 # dtm
 dtm_temp <- 
@@ -330,7 +420,16 @@ dtm_temp <-
   ggplot2::theme_void() +
   ggplot2::theme(legend.position = "none")
 dtm_temp +
-  ggplot2::geom_sf(data = piles_temp %>% sf::st_transform(crs_temp), fill = NA, color = "orangered2", lwd = 0.9)
+  ggplot2::geom_sf(
+    data = piles_temp %>% sf::st_transform(crs_temp)
+    , fill = NA, color = "orangered2", lwd = 0.8
+  ) +
+  ggplot2::geom_sf_label(
+    data = piles_bbox_temp %>% sf::st_transform(crs_temp)
+    , ggplot2::aes(label = rn, fontface = "bold")
+    , vjust = 0, hjust = 0.5
+    # , color = "white"
+  )
 ggplot2::ggsave("../data/dtmtesttest.jpg", height = 7, width = 7.5)
 # chm
 chm_temp <- 
@@ -345,14 +444,69 @@ chm_temp <-
   ggplot2::ggplot() +
   ggplot2::geom_tile(ggplot2::aes(x=x,y=y,fill=f)) +
   # harrypotter::scale_fill_hp("mischief") +
-  # ggplot2::scale_fill_viridis_c(option = "mako", direction = -1) +
-  ggplot2::scale_fill_distiller(palette = "BrBG", direction = 1) +
+  ggplot2::scale_fill_viridis_c(option = "mako", direction = -1) +
+  # ggplot2::scale_fill_distiller(palette = "BrBG", direction = 1) +
   ggplot2::scale_x_continuous(expand = c(0, 0)) +
   ggplot2::scale_y_continuous(expand = c(0, 0)) +
   ggplot2::theme_void() +
   ggplot2::theme(legend.position = "none")
 chm_temp +
-  ggplot2::geom_sf(data = piles_temp %>% sf::st_transform(crs_temp), fill = NA, color = "orangered2", lwd = 0.9)
+  ggplot2::geom_sf(
+    data = piles_temp %>% sf::st_transform(crs_temp)
+    , fill = NA, color = "orangered2", lwd = 0.8
+  ) +
+  ggplot2::geom_sf_label(
+    data = piles_bbox_temp %>% sf::st_transform(crs_temp)
+    , ggplot2::aes(label = rn, fontface = "bold")
+    , vjust = 0, hjust = 0.5
+    # , color = "white"
+  )
 ggplot2::ggsave("../data/chmtesttest.jpg", height = 7, width = 7.5)
+```
+
+
+```{r}
+# cld
+ctg_temp <- lidR::readLAScatalog(
+  "D:\\PFDP_Data\\p4pro_images\\P4Pro_06_17_2021_half_half_optimal\\2_densification\\point_cloud"
+  # "../data/error_point_cloud_processing_temp/02_normalize"
+  , select = "xyzRGB"
+)
+lidR::opt_progress(ctg_temp) <- F
+lidR::opt_filter(ctg_temp) <- "-drop_duplicates"
+
+lidR::clip_roi(
+  ctg_temp
+  # biggest mechanical
+  , piles_temp %>%
+    dplyr::filter(rn==1) %>% 
+    sf::st_centroid() %>% 
+    sf::st_buffer(4.2, endCapStyle = "SQUARE") %>% 
+    sf::st_transform(lidR::st_crs(ctg_temp))
+) %>% 
+lidR::plot(
+    color = "RGB", bg = "white", legend = F
+  )  
+
+
+lidR::clip_roi(
+  ctg_temp
+  # biggest mechanical
+  , piles_temp %>%
+    dplyr::filter(rn==5) %>% 
+    sf::st_centroid() %>% 
+    sf::st_buffer(4.0, endCapStyle = "SQUARE") %>% 
+    sf::st_transform(lidR::st_crs(ctg_temp))
+) %>% 
+lidR::plot(
+    color = "RGB", bg = "white", legend = F
+  )  
+
+
+p_fn_temp(1)
+p_fn_temp(2)
+p_fn_temp(3)
+p_fn_temp(4)
+p_fn_temp(5)
 ```
 
