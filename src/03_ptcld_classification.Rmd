@@ -102,13 +102,13 @@ if(!dir.exists("../data/point_cloud_processing_delivery")){
     , input_las_dir = "D:\\PFDP_Data\\p4pro_images\\P4Pro_06_17_2021_half_half_optimal\\2_densification\\point_cloud"
     , accuracy_level = 2
     , keep_intrmdt = T
-    , dtm_res_m = 0.5
-    , chm_res_m = 0.2
+    , dtm_res_m = 0.25
+    , chm_res_m = 0.1
     , min_height = 0 # effectively generates a DSM based on non-ground points
   )
 }else{
-  dtm_temp <- terra::rast("../data/point_cloud_processing_delivery/dtm_0.5m.tif")
-  chm_temp <- terra::rast("../data/point_cloud_processing_delivery/chm_0.2m.tif")
+  dtm_temp <- terra::rast("../data/xxpoint_cloud_processing_delivery/dtm_0.5m.tif")
+  chm_temp <- terra::rast("../data/xxpoint_cloud_processing_delivery/chm_0.2m.tif")
   cloud2raster_ans <- list(
     "dtm_rast" = dtm_temp
     , "chm_rast" = chm_temp
@@ -225,7 +225,7 @@ plt_combine_temp <- function(
     , title1 = "DTM"
     , vopt1 = "viridis"
     , rast2 = cloud2raster_ans$chm_rast
-    , title2 = "DSM"
+    , title2 = "CHM"
     , vopt2 = "plasma"
     , crs = terra::crs(cloud2raster_ans$dtm_rast)
 ) {
@@ -293,6 +293,93 @@ We'll first attempt to detect slash piles using raster-based methods with the DT
 ### Watershed Segmentation
 
 When used for individual tree detection (ITD), this technique treats the CHM as a topographic surface, where local maxima represent tree tops and valleys represent crown boundaries. A "water source" is conceptually placed at each local lowest point, and the surface is "flooded." Barriers are generated where different "water sources" meet, forming watershed lines that delineate individual tree crowns.
+
+two possible approaches for segmenting piles are to: 1) segment individual trees using a top-down approach and then use the canopy cover as a mask to then identify slash piles; 2) use a bottoms-up approach to perform slash pile segmentation on a lower "slice" of the CHM based on an expected maximum height of a pile
+
+we'll first try the bottoms-up approach using a CHM slice with a maximum height of 4 m based on the highest point in the point cloud (3.65 m) of the slash pile which had the tallest measurement in the field (6.4 m). The 6.4 m (21 ft) field measured height seems unlikely even for a machine pile, so we'll use the point cloud measured height which will align with the CHM data.
+
+check out the lower slice of the CHM
+
+```{r}
+# set the max expected pile height
+max_ht_m <- 4
+# lower CHM slice
+cloud2raster_ans$chm_rast %>% 
+  terra::clamp(upper = max_ht_m, lower = 0, values = F) %>% 
+  terra::plot(col = viridis::plasma(100), axes = F)
+```
+
+already, it looks like the piles should be distinguishable objects from this data
+
+let's run watershed segmentation using `lidR::watershed()` which is based on the bioconductor package `EBIimage`
+
+```{r}
+watershed_ans <- lidR::watershed(
+    chm = cloud2raster_ans$chm_rast %>% 
+      terra::clamp(upper = max_ht_m, lower = 0, values = F)
+    , th_tree = 0.5
+  )()
+# this is a raster
+watershed_ans
+```
+
+each value should be a unique "segment" which we can refine based on rules of expected size and shape of piles
+
+```{r}
+terra::freq(watershed_ans) %>% 
+  dplyr::slice_sample(n = 10)
+```
+
+where the "value" is the segment identifier and the count is the number of raster cells assigned to that segment
+
+let's plot the raster return from the watershed segmentation
+
+```{r}
+watershed_ans %>% 
+  terra::plot(
+    col = c(
+      viridis::turbo(n = floor(terra::minmax(watershed_ans)[2]/3))
+      , viridis::viridis(n = floor(terra::minmax(watershed_ans)[2]/3))
+      , viridis::cividis(n = floor(terra::minmax(watershed_ans)[2]/3))
+    ) %>% sample()
+    , legend = F
+    , axes = F
+  )
+```
+
+we can quickly calculate the area of the segments which we could use as a filter
+
+```{r}
+min_area_m2 <- 2
+# Two standard US parking spaces, typically measuring 9 feet by 18 feet, 
+# are roughly equivalent to 30.25 square meters. Each space is approximately 15.125 square meters.
+max_area_m2 <- 40
+# list of segments that meet size threshold
+keep_segs_temp <- watershed_ans %>% 
+  terra::freq() %>% 
+  dplyr::mutate(area_m2 = count * (terra::res(watershed_ans) %>% .[1:2] %>% prod()) ) %>% 
+  dplyr::filter(
+    area_m2 >= min_area_m2 & 
+    area_m2 <= max_area_m2
+  ) %>%
+  dplyr::pull(value)
+# filter the raster and plot it
+filtered_watershed_ans <- watershed_ans %>% 
+  terra::subst(from = keep_segs_temp, to = keep_segs_temp, others = NA)
+# plot it 
+filtered_watershed_ans %>% 
+  terra::plot(
+    col = c(
+      viridis::turbo(n = floor(nrow(terra::freq(filtered_watershed_ans))/3))
+      , viridis::viridis(n = floor(nrow(terra::freq(filtered_watershed_ans))/3))
+      , viridis::cividis(n = floor(nrow(terra::freq(filtered_watershed_ans))/3))
+    ) %>% sample()
+    , legend = F
+    , axes = F
+  )
+```
+
+zomg...we are getting so close. now let's try to filter based on Hough circle fitting or some sort of regular shape filter to get rid of irregular shapes.
 
 ```{r, include=FALSE, eval=TRUE}
 # quick function to ingest a sf data.frame with geometry features for each row
@@ -368,12 +455,13 @@ sf_bbox_by_row <- function(
     dplyr::select(-c(xmin_temp,ymin_temp,xmax_temp,ymax_temp))
   }
 }
-
 ```
 
 
-```{r}
-pile_id_temp <- 73
+```{r, include = F, eval = F}
+pile_id_temp <- 
+  # slash_piles_polys %>% dplyr::arrange(desc(diameter)) %>% dplyr::slice(1) %>% dplyr::pull(pile_id)
+  73
 crs_temp <- terra::crs(ortho_rast)
 # buff
 buff_temp <- slash_piles_polys %>% dplyr::filter(pile_id == pile_id_temp) %>% 
@@ -465,11 +553,11 @@ ggplot2::ggsave("../data/chmtesttest.jpg", height = 7, width = 7.5)
 ```
 
 
-```{r}
+```{r, include = F, eval = F}
 # cld
 ctg_temp <- lidR::readLAScatalog(
   "D:\\PFDP_Data\\p4pro_images\\P4Pro_06_17_2021_half_half_optimal\\2_densification\\point_cloud"
-  # "../data/error_point_cloud_processing_temp/02_normalize"
+  # "../data/point_cloud_processing_temp/02_normalize"
   , select = "xyzRGB"
 )
 lidR::opt_progress(ctg_temp) <- F
@@ -493,11 +581,13 @@ lidR::clip_roi(
   ctg_temp
   # biggest mechanical
   , piles_temp %>%
-    dplyr::filter(rn==5) %>% 
+    dplyr::filter(rn==2) %>% 
     sf::st_centroid() %>% 
-    sf::st_buffer(4.0, endCapStyle = "SQUARE") %>% 
+    sf::st_buffer(5, endCapStyle = "SQUARE") %>% 
     sf::st_transform(lidR::st_crs(ctg_temp))
 ) %>% 
+  purrr::pluck("data") %>% 
+  summary()
 lidR::plot(
     color = "RGB", bg = "white", legend = F
   )  
